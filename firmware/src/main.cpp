@@ -119,6 +119,9 @@ static void watchdog_start(void)
 
 void setup()
 {
+    /* 4 KB instead of the 256-byte default, so a burst from the host is not
+     * dropped before loop() drains it (docs/bugs/004). Must precede begin(). */
+    Serial.setRxBufferSize(4096);
     Serial.begin(UART_BAUD);
     Wire.begin(PIN_SDA, PIN_SCL, I2C_HZ);
     Wire.setTimeOut(50);                      /* a dead bus must not stall the loop */

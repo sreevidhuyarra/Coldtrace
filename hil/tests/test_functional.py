@@ -84,18 +84,33 @@ def test_stream_on_emits_samples_and_off_stops_them(device, target):
     assert device.collect_events("S", 0.6) == []
 
 
+def events_read_mid_command(log) -> int:
+    """How many EVT S lines were read while a command was waiting for its response
+    (between a sent line and the OK/ERR that answered it)."""
+    count, in_flight = 0, False
+    for _, direction, text in log:
+        if direction == "->":
+            in_flight = True
+        elif text.startswith(("OK", "ERR")):
+            in_flight = False
+        elif in_flight and text.startswith("EVT S "):
+            count += 1
+    return count
+
+
 def test_commands_work_while_streaming(device):
-    """HIL-FN-09: with samples streaming every 100 ms, commands sent back to back keep
-    getting their own correct response until 5 sample events have arrived in between;
-    no EVT line is ever mistaken for a response."""
+    """HIL-FN-09: with samples streaming every 100 ms, keep sending commands until 5
+    sample events have been read while a command was waiting for its response.
+    Every command must still get its own correct response; no EVT line may be
+    mistaken for one."""
+    mark = device.log_mark()
     device.expect_ok("RATE 100")
     device.expect_ok("STREAM ON")
-    deadline_cmds = 20000                     # guard against an endless loop
-    sent = 0
-    while sum(e.name == "S" for e in device.events) < 5:
+    for _ in range(2000):                     # guard against an endless loop
+        if events_read_mid_command(device.log[mark:]) >= 5:
+            break
         assert device.command("PING").raw == "OK PONG"
         assert device.status()["rate_ms"] == 100
-        sent += 2
-        assert sent < deadline_cmds, "sample events never arrived"
+    else:
+        pytest.fail("sample events never arrived during a command")
     device.expect_ok("STREAM OFF")
-    assert sent >= 10, f"only {sent} commands overlapped the stream"
