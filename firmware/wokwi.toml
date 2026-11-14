@@ -1,0 +1,8 @@
+# Wokwi runs the test-hook build, so FAULT commands work in the simulator.
+[wokwi]
+version = 1
+firmware = '.pio/build/esp32_test/firmware.bin'
+elf = '.pio/build/esp32_test/firmware.elf'
+# Serial port over TCP (RFC2217) for the Project 1 harness:
+#   pyserial URL  rfc2217://localhost:4000
+rfc2217ServerPort = 4000

@@ -1,0 +1,6 @@
+name: Task watchdog resets the chip
+version: 1
+steps:
+  - wait-serial: 'SPIKE BOOT n=1'
+  - wait-serial: 'SPIKE HANG'
+  - wait-serial: 'SPIKE BOOT n=2'

@@ -1,0 +1,11 @@
+name: MPU6050 temperature follows the Wokwi control
+version: 1
+steps:
+  - wait-serial: 'SPIKE temp WHO_AM_I'
+  - delay: 2500ms
+  - set-control: { part-id: imu1, control: temperature, value: 40 }
+  - delay: 2500ms
+  - set-control: { part-id: imu1, control: temperature, value: -10 }
+  - delay: 2500ms
+  - set-control: { part-id: imu1, control: temperature, value: 85 }
+  - delay: 2500ms
