@@ -61,7 +61,8 @@ typedef struct {
 /* Print the BOOT line and bring the sensor up (OK, or LOST with an event). */
 void             logger_init(logger_t *lg, const hal_t *hal, reset_reason_t reason);
 
-/* Feed one received UART byte; a completed line runs its command. */
+/* Feed one received UART byte; a completed line runs its command.
+ * Ignored while a reset or hang is pending (see logger_take_action). */
 void             logger_rx_byte(logger_t *lg, char c);
 
 /* Take a sample when due; retry the sensor while LOST. Never blocks. */

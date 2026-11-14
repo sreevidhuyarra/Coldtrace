@@ -295,6 +295,23 @@ static void test_reset_requests_a_software_reset_once(void)
     TEST_ASSERT_EQUAL(ACT_NONE, logger_take_action(&lg));
 }
 
+/* Bug 003: commands already in the receive buffer must not run once a
+ * reset or hang is pending; "the next line after OK RESET is BOOT". */
+static void test_input_after_reset_is_ignored(void)
+{
+    TEST_ASSERT_EQUAL_STRING("OK RESET\r\n", send("RESET"));
+    TEST_ASSERT_EQUAL_STRING("", send("RATE 500"));
+    TEST_ASSERT_EQUAL_UINT32(LOGGER_RATE_DEFAULT_MS, lg.rate_ms);
+    TEST_ASSERT_EQUAL(ACT_RESET, logger_take_action(&lg));
+}
+
+static void test_input_after_hang_is_ignored(void)
+{
+    TEST_ASSERT_EQUAL_STRING("OK FAULT HANG\r\n", send("FAULT HANG"));
+    TEST_ASSERT_EQUAL_STRING("", send("PING"));
+    TEST_ASSERT_EQUAL(ACT_HANG, logger_take_action(&lg));
+}
+
 static void test_fault_i2c_loses_the_sensor_and_off_recovers_it(void)
 {
     TEST_ASSERT_EQUAL_STRING("OK FAULT I2C ON\r\n", send("FAULT I2C ON"));
@@ -358,6 +375,8 @@ int main(void)
     RUN_TEST(test_failed_retry_stays_lost_and_tries_again_later);
     RUN_TEST(test_errors_counts_every_failed_transaction);
     RUN_TEST(test_reset_requests_a_software_reset_once);
+    RUN_TEST(test_input_after_reset_is_ignored);
+    RUN_TEST(test_input_after_hang_is_ignored);
     RUN_TEST(test_fault_i2c_loses_the_sensor_and_off_recovers_it);
     RUN_TEST(test_fault_i2c_never_touches_the_real_bus);
     RUN_TEST(test_fault_hang_requests_a_hang);

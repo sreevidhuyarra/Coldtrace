@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Unit tests (Unity, host gcc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Build and run the firmware core unit tests
+        run: make test
+
+  hil-sim:
+    name: HIL suite on the host simulator
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the host simulator
+        run: make sim
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: hil/requirements.txt
+      - name: Install harness dependencies
+        run: pip install -r hil/requirements.txt
+      - name: Run pytest --target sim
+        working-directory: hil
+        run: pytest --target sim
+      - name: Upload HTML and JUnit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hil-sim-report
+          path: |
+            reports/sim-report.html
+            reports/sim-junit.xml
+            reports/latency-sim.json
+
+  firmware:
+    name: ESP32 firmware build (PlatformIO)
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache PlatformIO toolchains
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
+      - name: Install PlatformIO
+        run: pip install platformio
+      - name: Build esp32 and esp32_test
+        working-directory: firmware
+        run: pio run -e esp32 -e esp32_test
+      - name: Upload firmware images
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          include-hidden-files: true   # the images live under .pio/
+          path: |
+            firmware/.pio/build/esp32/firmware.bin
+            firmware/.pio/build/esp32_test/firmware.bin
+            firmware/.pio/build/esp32_test/firmware.elf
+
+  wokwi-smoke:
+    name: Wokwi boot check (optional)
+    needs: firmware
+    runs-on: ubuntu-latest
+    env:
+      WOKWI_CLI_TOKEN: ${{ secrets.WOKWI_CLI_TOKEN }}
+    steps:
+      - name: Skip without a Wokwi token
+        if: env.WOKWI_CLI_TOKEN == ''
+        run: echo "No WOKWI_CLI_TOKEN secret set; skipping the Wokwi boot check."
+      - uses: actions/checkout@v4
+        if: env.WOKWI_CLI_TOKEN != ''
+      - uses: actions/download-artifact@v4
+        if: env.WOKWI_CLI_TOKEN != ''
+        with:
+          name: firmware
+          path: firmware/.pio/build
+      - name: Boot the esp32_test firmware in Wokwi
+        if: env.WOKWI_CLI_TOKEN != ''
+        uses: wokwi/wokwi-ci-action@v1
+        with:
+          token: ${{ secrets.WOKWI_CLI_TOKEN }}
+          path: firmware
+          timeout: 30000
+          expect_text: "BOOT fw=1.0.0"

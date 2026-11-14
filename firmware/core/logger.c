@@ -352,6 +352,13 @@ void logger_init(logger_t *lg, const hal_t *hal, reset_reason_t reason)
 
 void logger_rx_byte(logger_t *lg, char c)
 {
+    /* A reset or hang is about to happen: input that arrives meanwhile is
+     * lost, exactly as it would be on a real reboot. Without this, commands
+     * already in the receive buffer ran before the reboot (docs/bugs/003). */
+    if (lg->pending != ACT_NONE) {
+        return;
+    }
+
     switch (cmd_parser_feed(&lg->parser, c)) {
     case CMD_LINE:
         run_line(lg, cmd_parser_line(&lg->parser));

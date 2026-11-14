@@ -19,6 +19,8 @@ ifneq ($(wildcard /ucrt64/bin/gcc.exe),)
   export TMP  := $(CURDIR)/build
   export TEMP := $(CURDIR)/build
   EXE := .exe
+  # link the simulator statically so it runs without MSYS2's DLLs on PATH
+  SIM_LDFLAGS := -static
 endif
 
 CORE   := firmware/core
@@ -43,8 +45,23 @@ DEFS_test_logger := -DLOGGER_TEST_HOOKS
 SUITES := test_ring_buffer test_cmd_parser test_mpu6050 test_logger test_logger_nohooks
 BINS   := $(addprefix $(BUILD)/,$(addsuffix $(EXE),$(SUITES)))
 
-.PHONY: test clean
+.DEFAULT_GOAL := test
+.PHONY: test sim clean
 .SECONDEXPANSION:
+
+# ---- host simulator (Project 1) ------------------------------------------
+# The firmware core + sim/host_main.c. build/sim has the test hooks,
+# build/sim_prod is the production build (FAULT -> ERR UNKNOWN).
+CORE_SRC  := $(CORE)/logger.c $(CORE)/ring_buffer.c $(CORE)/cmd_parser.c $(CORE)/mpu6050.c
+SIM_FLAGS := -std=c99 -Wall -Wextra -Werror -pedantic -O2 -pthread -I$(CORE)
+
+sim: $(BUILD)/sim$(EXE) $(BUILD)/sim_prod$(EXE)
+
+$(BUILD)/sim$(EXE): sim/host_main.c $(CORE_SRC) $(wildcard $(CORE)/*.h) | $(BUILD)
+	$(CC) $(SIM_FLAGS) -DLOGGER_TEST_HOOKS -o $@ sim/host_main.c $(CORE_SRC) $(SIM_LDFLAGS)
+
+$(BUILD)/sim_prod$(EXE): sim/host_main.c $(CORE_SRC) $(wildcard $(CORE)/*.h) | $(BUILD)
+	$(CC) $(SIM_FLAGS) -o $@ sim/host_main.c $(CORE_SRC) $(SIM_LDFLAGS)
 
 test: $(BINS)
 	@set -e; for t in $(BINS); do echo "== $$t"; ./$$t; done

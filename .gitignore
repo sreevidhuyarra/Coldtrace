@@ -3,3 +3,7 @@ build/
 .vscode/
 *.exe
 *.o
+.venv/
+reports/*.xml
+__pycache__/
+.pytest_cache/
