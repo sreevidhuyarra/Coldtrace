@@ -21,7 +21,11 @@ Project 1 test harness checks; every row below has at least one unit test in `fi
   with `ERR TOOLONG`.
 - Commands are **upper-case**. Arguments are separated by **exactly one space**; a leading, trailing or double
   space is answered with `ERR ARGS`. At most 3 arguments.
-- Empty lines are ignored (no response).
+- Empty lines are ignored (no response). A host that may have lost bytes (for example after a very long
+  burst; the firmware buffers 4 KB, see [bug 004](bugs/004-uart-rx-overflow-drops-bytes-in-bursts.md)) can
+  resynchronise by sending an empty line: it ends any partial line and is otherwise ignored.
+- Input that arrives after `OK RESET` or `OK FAULT HANG` is discarded; the next line from the device is
+  `BOOT` ([bug 003](bugs/003-commands-answered-after-reset-or-hang.md)).
 - Every command gets **exactly one** response line starting with `OK` or `ERR`. `DUMP` then adds its sample
   lines and `END`.
 - Lines the firmware sends on its own start with `BOOT` or `EVT`.

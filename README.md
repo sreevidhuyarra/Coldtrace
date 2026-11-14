@@ -1,134 +1,129 @@
-# ESP32 Temperature Logger Firmware
+# ESP32 Temperature Logger — Firmware and HIL Test Harness
 
-Firmware for an ESP32 that reads temperature from an MPU6050 over I²C, keeps the last 64 samples in a ring
-buffer, and answers text commands over UART. It detects a failed sensor, keeps working, and recovers on its own
-when the sensor comes back. A task watchdog reboots the chip if the main loop stalls, and every boot reports why
-it restarted.
+[![CI](https://github.com/sreevidhuyarra/esp32-logger/actions/workflows/ci.yml/badge.svg)](https://github.com/sreevidhuyarra/esp32-logger/actions/workflows/ci.yml)
 
-It runs entirely in the [Wokwi](https://wokwi.com) simulator, so no hardware is needed. The logic is portable
-C99 with 57 unit tests that run on a PC in under a second.
+Two projects in one repository:
+
+1. **Firmware** for an ESP32 that reads temperature from an MPU6050 over I²C, keeps the last 64 samples in a
+   ring buffer, and answers text commands over UART. It detects a failed sensor, keeps working, and recovers on
+   its own. A task watchdog reboots the chip if the main loop stalls.
+2. **A hardware-in-the-loop (HIL) test harness** in Python/pytest that drives the firmware over its serial
+   protocol and checks every behaviour: commands, timing, error handling, sensor faults, resets and latency.
+   The same 38 tests run against a host simulator (in CI), the real firmware in the
+   [Wokwi](https://wokwi.com) simulator, and a real board.
+
+No hardware is needed for any of it.
 
 ![Firmware running in Wokwi](docs/img/wokwi-demo.png)
 
-## Features
+## Quick start
 
-- **I²C driver** for the MPU6050 temperature sensor: probe (`WHO_AM_I`), wake, burst read, integer-only
-  conversion to centi-degrees (within 0.01 °C of the datasheet formula over the full raw range)
-- **UART command protocol** with strict framing and one response per command: see
-  [docs/protocol.md](docs/protocol.md)
-- **Ring buffer** of 64 samples that overwrites the oldest when full and counts what it lost
-- **Sensor fault handling:** 1–2 failed reads tolerated, 3 in a row mark the sensor LOST, retry every 5 s,
-  automatic recovery, no reboot
-- **Task watchdog** (3 s) and reset-reason reporting (`POWERON`, `SOFTWARE`, `WATCHDOG`, `OTHER`)
-- **Non-blocking main loop:** no `delay()`, wrap-safe timing (`now - last >= interval`)
-- **Fault injection** (`FAULT I2C`, `FAULT HANG`) compiled only into the test build
-
-## How it is built
-
-```text
- UART text            src/main.cpp          (the only Arduino code)
-     │                   │  Wire · Serial · millis() · watchdog · reset reason
-     ▼                   ▼
- ┌────────────── hal_t: four function pointers ───────────────┐
- │                core/  — portable C99, no Arduino            │
- │   logger.c   sampling · state machine · command handlers   │
- │   cmd_parser.c   ring_buffer.c   mpu6050.c                  │
- └─────────────────────────────────────────────────────────────┘
-     ▲
- test/fakes/fake_hal.c — fake I²C bus, fake clock, captured UART (unit tests)
+```sh
+git clone --recursive https://github.com/sreevidhuyarra/esp32-logger.git && cd esp32-logger
+make test sim                               # 59 unit tests, then build the host simulator
+pip install -r hil/requirements.txt         # Python 3.12
+cd hil && pytest --target sim               # 38 HIL tests -> reports/sim-report.html
 ```
 
-The core reaches hardware only through a `hal_t` of function pointers. On the ESP32 they call Wire and Serial;
-in the unit tests they are fakes, so the same code is tested on a PC with no board and no simulator. The core
-never resets or hangs the chip itself: it *requests* that, and `main.cpp` acts on the request.
+On Windows, use MSYS2's make (`C:\msys64\usr\bin\make.exe test sim`); everything else is the same.
 
-Design decisions worth knowing:
+## Results
 
-- **Integer centi-degrees** (`int16_t`, 2401 = 24.01 °C) instead of `float`: exact, cheap and easy to test.
-- **Overwrite oldest when full:** a logger values the newest data, and sampling must never stop.
-- **Fixed-size buffers, no `malloc`, no `String`** anywhere in the core.
+| Run | Result | Report |
+| --- | --- | --- |
+| Unit tests (`make test`) | 59 / 59 pass, < 1 s | — |
+| HIL, host simulator | 38 / 38 pass in ~34 s; also in random order | [reports/sim-report.html](reports/sim-report.html) |
+| HIL, Wokwi (real firmware) | 36 pass, 1 not applicable, 1 known Wokwi limitation (xfail) | [reports/wokwi-report.html](reports/wokwi-report.html) |
+| CI (GitHub Actions) | unit, HIL on simulator, firmware build, optional Wokwi boot check | [Actions](https://github.com/sreevidhuyarra/esp32-logger/actions) |
+
+![HIL test report](docs/img/hil-report.png)
+
+The harness found two real firmware bugs, both now fixed and covered by tests:
+
+- [Bug 003](docs/bugs/003-commands-answered-after-reset-or-hang.md): commands sent right behind `RESET` or
+  `FAULT HANG` were still answered, so a setting could be "accepted" and then silently lost in the reboot.
+- [Bug 004](docs/bugs/004-uart-rx-overflow-drops-bytes-in-bursts.md): bursts over ~1.5 KB overflowed the
+  ESP32's 256-byte serial receive buffer and the next command was lost. Found only on the real firmware in
+  Wokwi; the simulator, with no UART, could not show it.
+
+The full traceability from requirement to test to result is in the [test plan](docs/test-plan.md).
+
+## How it fits together
+
+```text
+ pytest tests  (smoke · functional · faults · robustness · resets · performance)
+        │   device.command("RATE 500") -> Response     events: EVT / BOOT queue
+        ▼
+ DeviceClient  (hil/embedded_hil)   sorts every line: response, DUMP body, event, noise
+        │                           logs the whole conversation into each test's report
+        ▼
+ Transport ── ProcessTransport ──► build/sim          host simulator   (--target sim, CI)
+          └── SerialTransport ───► rfc2217://localhost:4000  Wokwi    (--target wokwi)
+                              └──► COM3 / /dev/ttyUSB0       a board  (--target serial)
+
+ Firmware:
+ UART ──► src/main.cpp (Arduino: Wire, Serial, watchdog, reset reason)   ─┐
+          sim/host_main.c (host: stdin/stdout, fake MPU6050, watchdog) ──┴─► hal_t ─► core/ (portable C99)
+                                                                              logger · cmd_parser · ring_buffer · mpu6050
+```
+
+- **Same core everywhere.** The firmware logic is portable C99 behind a `hal_t` of function pointers. The ESP32,
+  the host simulator and the unit tests each supply their own HAL, so CI tests the exact C that runs on the chip.
+- **Events never break responses.** The device can send `EVT S …` or `BOOT …` at any moment. `DeviceClient`
+  queues those with timestamps, so a sample arriving mid-command is collected later with `wait_for_event()`.
+- **Independent tests.** Before each test a fixture turns streaming and faults off, resets the rate, clears the
+  buffer and waits for a healthy sensor. The suite passes in random order.
+- **Fault injection** with `FAULT I2C ON|OFF` (unplugged sensor) and `FAULT HANG` (stalled loop), compiled only
+  into the test build. A test proves the production build rejects them.
+- **Timing without flakiness.** Tests wait for events rather than sleeping, timeouts scale per target (Wokwi ×4),
+  and sample spacing is checked with the device's own timestamps.
+
+## Running each target
+
+| Target | Prepare | Run (from `hil/`) |
+| --- | --- | --- |
+| Host simulator | `make sim` | `pytest --target sim` |
+| Wokwi | `cd firmware && pio run`, then in VS Code open `firmware/diagram.json` → F1 → **Wokwi: Start Simulator** | `pytest --target wokwi` |
+| Real board | Flash `esp32_test` (`pio run -e esp32_test -t upload`) | `pytest --target serial --port COM3` |
+
+Useful subsets: `pytest -m smoke` (about 1 s), `pytest -m "not slow"`, `pytest -p random_order`.
+Reports go to `reports/<target>-report.html` and `reports/<target>-junit.xml`.
+
+## Firmware features
+
+- **I²C driver** for the MPU6050 temperature sensor, with integer-only conversion to centi-degrees
+- **UART command protocol** with strict framing: [docs/protocol.md](docs/protocol.md)
+- **Ring buffer** of 64 samples that overwrites the oldest and counts what it lost
+- **Sensor fault handling:** 3 failed reads mark the sensor LOST, retry every 5 s, recover without a reboot
+- **Task watchdog** (3 s) and reset-reason reporting (`POWERON`, `SOFTWARE`, `WATCHDOG`, `OTHER`)
+- **Non-blocking main loop:** no `delay()`, wrap-safe timing; no `malloc` or `String` in the core
 
 ## Repository layout
 
 | Path | Contents |
 | --- | --- |
 | `firmware/core/` | Portable C99: HAL interface, ring buffer, command parser, MPU6050 driver, logger |
-| `firmware/src/main.cpp` | Arduino platform layer: HAL implementation, watchdog, reset reason, main loop |
+| `firmware/src/main.cpp` | Arduino platform layer |
 | `firmware/test/` | Unity unit tests and the fake HAL |
-| `firmware/platformio.ini` | Builds `esp32` (production) and `esp32_test` (with fault hooks) |
-| `firmware/diagram.json`, `wokwi.toml` | Wokwi circuit (ESP32 + MPU6050) and simulator config |
-| `docs/protocol.md` | The serial protocol |
-| `docs/spike-notes.md` | Day-1 checks of the simulator's sensor and watchdog models |
-| `docs/bugs/` | Bugs found while testing in Wokwi |
-| `spike/` | Throwaway sketches from those checks |
-| `third_party/unity/` | Unity test framework (git submodule, v2.6.1) |
-
-## Build and test
-
-Prerequisites: VS Code with the PlatformIO and Wokwi extensions; for the unit tests, gcc and make (on Windows,
-[MSYS2](https://www.msys2.org/) with `mingw-w64-ucrt-x86_64-gcc` and `make`).
-
-```sh
-git clone --recursive <repo-url>
-cd esp32-logger
-
-# unit tests on the PC (Windows: C:\msys64\usr\bin\make.exe test)
-make test
-
-# firmware, both builds
-cd firmware
-pio run
-```
-
-Both firmware builds compile with zero warnings (`-Wall -Wextra -Werror` on project code). The unit tests
-build with `-Wall -Wextra -Werror -pedantic -Wconversion`.
-
-## Run in Wokwi
-
-1. Build once (`pio run` in `firmware/`).
-2. Open `firmware/diagram.json` in VS Code, then F1 → **Wokwi: Start Simulator**.
-3. The terminal shows `BOOT fw=1.0.0 reset=POWERON`. Type commands and press Enter:
-
-```text
-PING            → OK PONG
-READ            → OK TEMP 24.01
-RATE 500        → OK RATE 500
-STREAM ON       → EVT S 50507 24.01 ...
-DUMP 3          → OK DUMP 3, three S lines, END
-FAULT I2C ON    → EVT SENSOR_LOST after about 3 s
-FAULT I2C OFF   → EVT SENSOR_OK within 5 s
-FAULT HANG      → watchdog reset, then BOOT ... reset=WATCHDOG
-```
-
-Click the MPU6050 to change its temperature, then `READ` again. The serial port is also on
-`rfc2217://localhost:4000` for automated tests.
-
-## Testing
-
-| Suite | Tests | Covers |
-| --- | --- | --- |
-| `test_ring_buffer` | 7 | Order, wrap at 64, overwrite oldest, overflow count, clear |
-| `test_cmd_parser` | 12 | Line endings, the 64/65-character boundary, recovery, argument splitting |
-| `test_mpu6050` | 10 | Probe, wake, byte order, I²C failures, conversion at known points and over all 65 536 raw values |
-| `test_logger` | 26 | Every protocol row, sampling schedule, `millis()` wrap, LOST/OK state machine, fault hooks |
-| `test_logger_nohooks` | 2 | Fault commands absent from the production build |
-
-To check that the tests catch real mistakes, 19 bugs were planted in the code one at a time (off-by-one limits,
-a wrap-unsafe time comparison, swapped bytes, a counter that never resets, and others). Three got through at
-first and led to stronger tests; in the end every one was caught by at least one test.
+| `firmware/platformio.ini`, `diagram.json`, `wokwi.toml` | Builds (`esp32`, `esp32_test`) and the Wokwi circuit |
+| `sim/host_main.c` | Host simulator: the core on a PC |
+| `hil/embedded_hil/` | Harness library: transports, `DeviceClient`, models |
+| `hil/tests/` | Fixtures and the six test suites |
+| `docs/` | Protocol, test plan, spike notes, bug reports |
+| `reports/` | Sample HTML reports and latency results from both targets |
+| `.github/workflows/ci.yml` | CI pipeline |
+| `third_party/unity/` | Unity test framework (submodule) |
 
 ## Known Wokwi limitations
 
-Both were found by testing in the simulator and are written up in `docs/`:
-
-- A watchdog reset is reported as ESP-IDF's `INT_WDT` instead of `TASK_WDT`, because Wokwi's panic handler
-  doesn't finish its normal restart. The firmware maps both to `reset=WATCHDOG`.
-  ([spike notes](docs/spike-notes.md))
-- `millis()` does not restart from 0 after a software reset (on real hardware it does), so `uptime_ms` keeps
-  counting across `RESET`. ([bug 002](docs/bugs/002-uptime-not-reset-after-software-reset.md))
+- A watchdog reset is reported as ESP-IDF's `INT_WDT`; the firmware maps it to `reset=WATCHDOG`
+  ([spike notes](docs/spike-notes.md)).
+- `millis()` does not restart after a software reset, so `HIL-RS-04` is `xfail` on Wokwi
+  ([bug 002](docs/bugs/002-uptime-not-reset-after-software-reset.md)).
+- Wokwi runs slower than real time: `PING` latency there is ~217 ms median versus ~0.13 ms on the simulator.
 
 ## Future work
 
-- Bring-up on a real ESP32 board
-- CRC or checksum on sample lines
-- Persist samples to flash across resets
+- Run the suite on a real ESP32 board (`--target serial`)
+- Bench instruments through PyVISA (power-supply brown-out tests), a relay to really unplug the sensor
+- CRC on sample lines; persist samples to flash

@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title id="head-title">Embedded HIL test report</title>
+      <style type="text/css">body {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  /* do not increase min-width as some may use split screens */
+  min-width: 800px;
+  color: #999;
+}
+
+h1 {
+  font-size: 24px;
+  color: black;
+}
+
+h2 {
+  font-size: 16px;
+  color: black;
+}
+
+p {
+  color: black;
+}
+
+a {
+  color: #999;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+/******************************
+ * SUMMARY INFORMATION
+ ******************************/
+#environment td {
+  padding: 5px;
+  border: 1px solid #e6e6e6;
+  vertical-align: top;
+}
+#environment tr:nth-child(odd) {
+  background-color: #f6f6f6;
+}
+#environment ul {
+  margin: 0;
+  padding: 0 20px;
+}
+
+/******************************
+ * TEST RESULT COLORS
+ ******************************/
+span.passed,
+.passed .col-result {
+  color: green;
+}
+
+span.skipped,
+span.xfailed,
+span.rerun,
+.skipped .col-result,
+.xfailed .col-result,
+.rerun .col-result {
+  color: orange;
+}
+
+span.error,
+span.failed,
+span.xpassed,
+.error .col-result,
+.failed .col-result,
+.xpassed .col-result {
+  color: red;
+}
+
+.col-links__extra {
+  margin-right: 3px;
+}
+
+/******************************
+ * RESULTS TABLE
+ *
+ * 1. Table Layout
+ * 2. Extra
+ * 3. Sorting items
+ *
+ ******************************/
+/*------------------
+ * 1. Table Layout
+ *------------------*/
+#results-table {
+  border: 1px solid #e6e6e6;
+  color: #999;
+  font-size: 12px;
+  width: 100%;
+}
+#results-table th,
+#results-table td {
+  padding: 5px;
+  border: 1px solid #e6e6e6;
+  text-align: left;
+}
+#results-table th {
+  font-weight: bold;
+}
+
+/*------------------
+ * 2. Extra
+ *------------------*/
+.logwrapper {
+  max-height: 230px;
+  overflow-y: scroll;
+  background-color: #e6e6e6;
+}
+.logwrapper.expanded {
+  max-height: none;
+}
+.logwrapper.expanded .logexpander:after {
+  content: "collapse [-]";
+}
+.logwrapper .logexpander {
+  z-index: 1;
+  position: sticky;
+  top: 10px;
+  width: max-content;
+  border: 1px solid;
+  border-radius: 3px;
+  padding: 5px 7px;
+  margin: 10px 0 10px calc(100% - 80px);
+  cursor: pointer;
+  background-color: #e6e6e6;
+}
+.logwrapper .logexpander:after {
+  content: "expand [+]";
+}
+.logwrapper .logexpander:hover {
+  color: #000;
+  border-color: #000;
+}
+.logwrapper .log {
+  min-height: 40px;
+  position: relative;
+  top: -50px;
+  height: calc(100% + 50px);
+  border: 1px solid #e6e6e6;
+  color: black;
+  display: block;
+  font-family: "Courier New", Courier, monospace;
+  padding: 5px;
+  padding-right: 80px;
+  white-space: pre-wrap;
+}
+
+div.media {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin: 0 5px;
+  overflow: hidden;
+  width: 320px;
+}
+
+.media-container {
+  display: grid;
+  grid-template-columns: 25px auto 25px;
+  align-items: center;
+  flex: 1 1;
+  overflow: hidden;
+  height: 200px;
+}
+
+.media-container--fullscreen {
+  grid-template-columns: 0px auto 0px;
+}
+
+.media-container__nav--right,
+.media-container__nav--left {
+  text-align: center;
+  cursor: pointer;
+}
+
+.media-container__viewport {
+  cursor: pointer;
+  text-align: center;
+  height: inherit;
+}
+.media-container__viewport img,
+.media-container__viewport video {
+  object-fit: cover;
+  width: 100%;
+  max-height: 100%;
+}
+
+.media__name,
+.media__counter {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  flex: 0 0 25px;
+  align-items: center;
+}
+
+.collapsible td:not(.col-links) {
+  cursor: pointer;
+}
+.collapsible td:not(.col-links):hover::after {
+  color: #bbb;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.col-result {
+  width: 130px;
+}
+.col-result:hover::after {
+  content: " (hide details)";
+}
+
+.col-result.collapsed:hover::after {
+  content: " (show details)";
+}
+
+#environment-header h2:hover::after {
+  content: " (hide details)";
+  color: #bbb;
+  font-style: italic;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+#environment-header.collapsed h2:hover::after {
+  content: " (show details)";
+  color: #bbb;
+  font-style: italic;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/*------------------
+ * 3. Sorting items
+ *------------------*/
+.sortable {
+  cursor: pointer;
+}
+.sortable.desc:after {
+  content: " ";
+  position: relative;
+  left: 5px;
+  bottom: -12.5px;
+  border: 10px solid #4caf50;
+  border-bottom: 0;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+.sortable.asc:after {
+  content: " ";
+  position: relative;
+  left: 5px;
+  bottom: 12.5px;
+  border: 10px solid #4caf50;
+  border-top: 0;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+
+.hidden, .summary__reload__button.hidden {
+  display: none;
+}
+
+.summary__data {
+  flex: 0 0 550px;
+}
+.summary__reload {
+  flex: 1 1;
+  display: flex;
+  justify-content: center;
+}
+.summary__reload__button {
+  flex: 0 0 300px;
+  display: flex;
+  color: white;
+  font-weight: bold;
+  background-color: #4caf50;
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.summary__reload__button:hover {
+  background-color: #46a049;
+}
+.summary__spacer {
+  flex: 0 0 550px;
+}
+
+.controls {
+  display: flex;
+  justify-content: space-between;
+}
+
+.filters,
+.collapse {
+  display: flex;
+  align-items: center;
+}
+.filters button,
+.collapse button {
+  color: #999;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.filters button:hover,
+.collapse button:hover {
+  color: #ccc;
+}
+
+.filter__label {
+  margin-right: 10px;
+}
+
+      </style>
+    
+  </head>
+  <body>
+    <h1 id="title">Embedded HIL test report</h1>
+    <p>Report generated on 15-Nov-2026 at 02:19:57 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a>
+        v4.2.0</p>
+    <div id="environment-header">
+      <h2>Environment</h2>
+    </div>
+    <table id="environment"></table>
+    <!-- TEMPLATES -->
+      <template id="template_environment_row">
+      <tr>
+        <td></td>
+        <td></td>
+      </tr>
+    </template>
+    <template id="template_results-table__body--empty">
+      <tbody class="results-table-row">
+        <tr id="not-found-message">
+          <td colspan="4">No results found. Check the filters.</td>
+        </tr>
+      </tbody>
+    </template>
+    <template id="template_results-table__tbody">
+      <tbody class="results-table-row">
+        <tr class="collapsible">
+        </tr>
+        <tr class="extras-row">
+          <td class="extra" colspan="4">
+            <div class="extraHTML"></div>
+            <div class="media">
+              <div class="media-container">
+                  <div class="media-container__nav--left">&lt;</div>
+                  <div class="media-container__viewport">
+                    <img src="" />
+                    <video controls>
+                      <source src="" type="video/mp4">
+                    </video>
+                  </div>
+                  <div class="media-container__nav--right">&gt;</div>
+                </div>
+                <div class="media__name"></div>
+                <div class="media__counter"></div>
+            </div>
+            <div class="logwrapper">
+              <div class="logexpander"></div>
+              <div class="log"></div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </template>
+    <!-- END TEMPLATES -->
+    <div class="summary">
+      <div class="summary__data">
+        <h2>Summary</h2>
+        <div class="additional-summary prefix">
+          <p><b>Target:</b> wokwi &nbsp; <b>Firmware:</b> 1.0.0 &nbsp; <b>Commit:</b> 08fae63</p>
+        </div>
+        <p class="run-count">37 tests took 00:03:27.</p>
+        <p class="filter">(Un)check the boxes to filter the results.</p>
+        <div class="summary__reload">
+          <div class="summary__reload__button hidden" onclick="location.reload()">
+            <div>There are still tests running. <br />Reload this page to get the latest results!</div>
+          </div>
+        </div>
+        <div class="summary__spacer"></div>
+        <div class="controls">
+          <div class="filters">
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="failed" disabled>
+            <span class="failed">0 Failed,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="passed" >
+            <span class="passed">36 Passed,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="skipped" >
+            <span class="skipped">1 Skipped,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="xfailed" >
+            <span class="xfailed">1 Expected failures,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="xpassed" disabled>
+            <span class="xpassed">0 Unexpected passes,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="error" disabled>
+            <span class="error">0 Errors,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="rerun" disabled>
+            <span class="rerun">0 Reruns</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="retried" disabled>
+            <span class="retried">0 Retried,</span>
+          </div>
+          <div class="collapse">
+            <button id="show_all_details">Show all details</button>&nbsp;/&nbsp;<button id="hide_all_details">Hide all details</button>
+          </div>
+        </div>
+      </div>
+      <div class="additional-summary summary">
+      </div>
+      <div class="additional-summary postfix">
+      </div>
+    </div>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable" data-column-type="result">Result</th>
+          <th class="sortable" data-column-type="testId">Test</th>
+          <th class="sortable" data-column-type="duration">Duration</th>
+          <th>Links</th>
+        </tr>
+      </thead>
+    </table>
+  <footer>
+    <div id="data-container" data-jsonblob="{&#34;environment&#34;: {&#34;Python&#34;: &#34;3.12.5&#34;, &#34;Platform&#34;: &#34;Windows-11-10.0.26200-SP0&#34;, &#34;Packages&#34;: {&#34;pytest&#34;: &#34;9.2.0&#34;, &#34;pluggy&#34;: &#34;1.7.0&#34;}, &#34;Plugins&#34;: {&#34;html&#34;: &#34;4.2.0&#34;, &#34;metadata&#34;: &#34;3.1.1&#34;, &#34;random-order&#34;: &#34;1.2.0&#34;}}, &#34;tests&#34;: {&#34;tests/test_faults.py::test_i2c_fault_gives_err_sensor_and_sensor_lost&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_faults.py::test_i2c_fault_gives_err_sensor_and_sensor_lost&#34;, &#34;duration&#34;: &#34;00:00:14&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_faults.py::test_i2c_fault_gives_err_sensor_and_sensor_lost&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:14&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n    8.818s -&amp;gt; FAULT I2C OFF\n    9.062s &amp;lt;- OK FAULT I2C OFF\n    9.266s -&amp;gt; STREAM OFF\n    9.533s &amp;lt;- OK STREAM OFF\n    9.533s -&amp;gt; FAULT I2C OFF\n    9.786s &amp;lt;- OK FAULT I2C OFF\n    9.786s -&amp;gt; RATE 1000\n   10.033s &amp;lt;- OK RATE 1000\n   10.033s -&amp;gt; CLEAR\n   10.261s &amp;lt;- OK CLEAR\n   10.261s -&amp;gt; STATUS\n   10.479s &amp;lt;- OK STATUS uptime_ms=127833 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n   10.680s -&amp;gt; FAULT I2C ON\n   10.829s &amp;lt;- OK FAULT I2C ON\n   10.829s -&amp;gt; READ\n   11.041s &amp;lt;- ERR SENSOR\n   13.376s &amp;lt;- EVT SENSOR_LOST\n   13.376s -&amp;gt; STATUS\n   13.606s &amp;lt;- OK STATUS uptime_ms=129300 samples=0 rate_ms=1000 sensor=LOST errors=3 overflows=0 reset=SOFTWARE&#34;}], &#34;tests/test_faults.py::test_error_counter_rises_on_failed_transactions&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_faults.py::test_error_counter_rises_on_failed_transactions&#34;, &#34;duration&#34;: &#34;00:00:12&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_faults.py::test_error_counter_rises_on_failed_transactions&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:12&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   13.815s -&amp;gt; STREAM OFF\n   13.959s &amp;lt;- OK STREAM OFF\n   13.959s -&amp;gt; FAULT I2C OFF\n   14.170s &amp;lt;- OK FAULT I2C OFF\n   14.170s -&amp;gt; RATE 1000\n   14.378s &amp;lt;- OK RATE 1000\n   14.378s -&amp;gt; CLEAR\n   14.592s &amp;lt;- OK CLEAR\n   14.592s -&amp;gt; STATUS\n   14.811s &amp;lt;- OK STATUS uptime_ms=129866 samples=0 rate_ms=1000 sensor=LOST errors=3 overflows=0 reset=SOFTWARE\n   24.154s &amp;lt;- EVT SENSOR_OK\n   24.359s -&amp;gt; STATUS\n   24.553s &amp;lt;- OK STATUS uptime_ms=134366 samples=0 rate_ms=1000 sensor=OK errors=3 overflows=0 reset=SOFTWARE\n   24.553s -&amp;gt; FAULT I2C ON\n   24.800s &amp;lt;- OK FAULT I2C ON\n   24.800s -&amp;gt; READ\n   25.032s &amp;lt;- ERR SENSOR\n   25.032s -&amp;gt; READ\n   25.256s &amp;lt;- ERR SENSOR\n   25.256s -&amp;gt; STATUS\n   25.475s &amp;lt;- OK STATUS uptime_ms=134766 samples=0 rate_ms=1000 sensor=OK errors=5 overflows=0 reset=SOFTWARE&#34;}], &#34;tests/test_faults.py::test_sensor_recovers_when_fault_cleared&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_faults.py::test_sensor_recovers_when_fault_cleared&#34;, &#34;duration&#34;: &#34;00:00:20&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_faults.py::test_sensor_recovers_when_fault_cleared&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:20&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   25.690s -&amp;gt; STREAM OFF\n   25.913s &amp;lt;- OK STREAM OFF\n   25.913s -&amp;gt; FAULT I2C OFF\n   26.135s &amp;lt;- OK FAULT I2C OFF\n   26.135s -&amp;gt; RATE 1000\n   26.363s &amp;lt;- OK RATE 1000\n   26.363s -&amp;gt; CLEAR\n   26.599s &amp;lt;- OK CLEAR\n   26.599s -&amp;gt; STATUS\n   26.829s &amp;lt;- OK STATUS uptime_ms=135366 samples=0 rate_ms=1000 sensor=OK errors=5 overflows=0 reset=SOFTWARE\n   27.031s -&amp;gt; FAULT I2C ON\n   27.183s &amp;lt;- OK FAULT I2C ON\n   27.183s -&amp;gt; READ\n   27.405s &amp;lt;- ERR SENSOR\n   31.109s &amp;lt;- EVT SENSOR_LOST\n   31.109s -&amp;gt; FAULT I2C OFF\n   31.346s &amp;lt;- OK FAULT I2C OFF\n   44.868s &amp;lt;- EVT SENSOR_OK\n   44.868s -&amp;gt; READ\n   45.147s &amp;lt;- OK TEMP 24.01&#34;}], &#34;tests/test_faults.py::test_commands_still_served_while_sensor_lost&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_faults.py::test_commands_still_served_while_sensor_lost&#34;, &#34;duration&#34;: &#34;00:00:13&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_faults.py::test_commands_still_served_while_sensor_lost&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:13&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   45.357s -&amp;gt; STREAM OFF\n   45.518s &amp;lt;- OK STREAM OFF\n   45.518s -&amp;gt; FAULT I2C OFF\n   45.791s &amp;lt;- OK FAULT I2C OFF\n   45.791s -&amp;gt; RATE 1000\n   46.089s &amp;lt;- OK RATE 1000\n   46.089s -&amp;gt; CLEAR\n   46.378s &amp;lt;- OK CLEAR\n   46.378s -&amp;gt; STATUS\n   46.687s &amp;lt;- OK STATUS uptime_ms=142833 samples=0 rate_ms=1000 sensor=OK errors=8 overflows=0 reset=SOFTWARE\n   46.895s -&amp;gt; FAULT I2C ON\n   47.072s &amp;lt;- OK FAULT I2C ON\n   47.072s -&amp;gt; READ\n   47.362s &amp;lt;- ERR SENSOR\n   50.618s &amp;lt;- EVT SENSOR_LOST\n   50.618s -&amp;gt; PING\n   50.897s &amp;lt;- OK PONG\n   50.897s -&amp;gt; PING\n   51.182s &amp;lt;- OK PONG\n   51.182s -&amp;gt; PING\n   51.462s &amp;lt;- OK PONG\n   51.462s -&amp;gt; PING\n   51.726s &amp;lt;- OK PONG\n   51.726s -&amp;gt; PING\n   51.996s &amp;lt;- OK PONG\n   51.996s -&amp;gt; STATUS\n   52.267s &amp;lt;- OK STATUS uptime_ms=144800 samples=0 rate_ms=1000 sensor=LOST errors=11 overflows=0 reset=SOFTWARE&#34;}], &#34;tests/test_faults.py::test_production_build_rejects_fault_commands&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Skipped&#34;, &#34;testId&#34;: &#34;tests/test_faults.py::test_production_build_rejects_fault_commands&#34;, &#34;duration&#34;: &#34;00:00:07&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Skipped&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_faults.py::test_production_build_rejects_fault_commands&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:07&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;(&amp;#x27;C:\\\\Users\\\\DELL\\\\esp32-logger\\\\hil\\\\tests\\\\test_faults.py&amp;#x27;, 71, &amp;#x27;Skipped: this target runs the test-hook build; nothing to check here&amp;#x27;)\n\n----------------------------- serial conversation ------------------------------\n   58.484s -&amp;gt; STREAM OFF\n   58.753s &amp;lt;- OK STREAM OFF\n   58.753s -&amp;gt; FAULT I2C OFF\n   59.033s &amp;lt;- OK FAULT I2C OFF\n   59.033s -&amp;gt; RATE 1000\n   59.320s &amp;lt;- OK RATE 1000\n   59.320s -&amp;gt; CLEAR\n   59.611s &amp;lt;- OK CLEAR\n   59.611s -&amp;gt; STATUS\n   59.893s &amp;lt;- OK STATUS uptime_ms=147400 samples=0 rate_ms=1000 sensor=LOST errors=11 overflows=0 reset=SOFTWARE\n   65.152s &amp;lt;- EVT SENSOR_OK&#34;}], &#34;tests/test_functional.py::test_read_matches_sensor_setting&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_read_matches_sensor_setting&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_read_matches_sensor_setting&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   65.582s -&amp;gt; STREAM OFF\n   65.702s &amp;lt;- OK STREAM OFF\n   65.702s -&amp;gt; FAULT I2C OFF\n   66.038s &amp;lt;- OK FAULT I2C OFF\n   66.038s -&amp;gt; RATE 1000\n   66.343s &amp;lt;- OK RATE 1000\n   66.343s -&amp;gt; CLEAR\n   66.633s &amp;lt;- OK CLEAR\n   66.633s -&amp;gt; STATUS\n   66.928s &amp;lt;- OK STATUS uptime_ms=149800 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   67.135s -&amp;gt; READ\n   67.393s &amp;lt;- OK TEMP 24.01&#34;}], &#34;tests/test_functional.py::test_rate_boundaries[99-ERR RANGE]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_rate_boundaries[99-ERR RANGE]&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_rate_boundaries[99-ERR RANGE]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   67.614s -&amp;gt; STREAM OFF\n   67.865s &amp;lt;- OK STREAM OFF\n   67.865s -&amp;gt; FAULT I2C OFF\n   68.141s &amp;lt;- OK FAULT I2C OFF\n   68.141s -&amp;gt; RATE 1000\n   68.428s &amp;lt;- OK RATE 1000\n   68.428s -&amp;gt; CLEAR\n   68.715s &amp;lt;- OK CLEAR\n   68.715s -&amp;gt; STATUS\n   69.017s &amp;lt;- OK STATUS uptime_ms=150533 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   69.229s -&amp;gt; RATE 99\n   69.555s &amp;lt;- ERR RANGE&#34;}], &#34;tests/test_functional.py::test_rate_boundaries[100-OK RATE 100]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_rate_boundaries[100-OK RATE 100]&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_rate_boundaries[100-OK RATE 100]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   69.764s -&amp;gt; STREAM OFF\n   70.042s &amp;lt;- OK STREAM OFF\n   70.043s -&amp;gt; FAULT I2C OFF\n   70.354s &amp;lt;- OK FAULT I2C OFF\n   70.354s -&amp;gt; RATE 1000\n   70.729s &amp;lt;- OK RATE 1000\n   70.729s -&amp;gt; CLEAR\n   71.073s &amp;lt;- OK CLEAR\n   71.073s -&amp;gt; STATUS\n   71.396s &amp;lt;- OK STATUS uptime_ms=151200 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   71.602s -&amp;gt; RATE 100\n   71.778s &amp;lt;- OK RATE 100&#34;}], &#34;tests/test_functional.py::test_rate_boundaries[60000-OK RATE 60000]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_rate_boundaries[60000-OK RATE 60000]&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_rate_boundaries[60000-OK RATE 60000]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   71.991s -&amp;gt; STREAM OFF\n   72.148s &amp;lt;- OK STREAM OFF\n   72.148s -&amp;gt; FAULT I2C OFF\n   72.341s &amp;lt;- OK FAULT I2C OFF\n   72.341s -&amp;gt; RATE 1000\n   72.533s &amp;lt;- OK RATE 1000\n   72.533s -&amp;gt; CLEAR\n   72.730s &amp;lt;- OK CLEAR\n   72.730s -&amp;gt; STATUS\n   72.934s &amp;lt;- OK STATUS uptime_ms=151733 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   73.151s -&amp;gt; RATE 60000\n   73.312s &amp;lt;- OK RATE 60000&#34;}], &#34;tests/test_functional.py::test_rate_boundaries[60001-ERR RANGE]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_rate_boundaries[60001-ERR RANGE]&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_rate_boundaries[60001-ERR RANGE]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   73.515s -&amp;gt; STREAM OFF\n   73.788s &amp;lt;- OK STREAM OFF\n   73.788s -&amp;gt; FAULT I2C OFF\n   73.975s &amp;lt;- OK FAULT I2C OFF\n   73.975s -&amp;gt; RATE 1000\n   74.154s &amp;lt;- OK RATE 1000\n   74.154s -&amp;gt; CLEAR\n   74.426s &amp;lt;- OK CLEAR\n   74.426s -&amp;gt; STATUS\n   74.599s &amp;lt;- OK STATUS uptime_ms=152333 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   74.814s -&amp;gt; RATE 60001\n   74.942s &amp;lt;- ERR RANGE&#34;}], &#34;tests/test_functional.py::test_rate_rejects_bad_arguments[RATE]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_rate_rejects_bad_arguments[RATE]&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_rate_rejects_bad_arguments[RATE]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   75.149s -&amp;gt; STREAM OFF\n   75.373s &amp;lt;- OK STREAM OFF\n   75.373s -&amp;gt; FAULT I2C OFF\n   75.626s &amp;lt;- OK FAULT I2C OFF\n   75.626s -&amp;gt; RATE 1000\n   75.799s &amp;lt;- OK RATE 1000\n   75.799s -&amp;gt; CLEAR\n   76.049s &amp;lt;- OK CLEAR\n   76.049s -&amp;gt; STATUS\n   76.305s &amp;lt;- OK STATUS uptime_ms=153000 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   76.515s -&amp;gt; RATE\n   76.803s &amp;lt;- ERR ARGS\n   76.803s -&amp;gt; STATUS\n   77.112s &amp;lt;- OK STATUS uptime_ms=153266 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE&#34;}], &#34;tests/test_functional.py::test_rate_rejects_bad_arguments[RATE abc]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_rate_rejects_bad_arguments[RATE abc]&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_rate_rejects_bad_arguments[RATE abc]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   77.317s -&amp;gt; STREAM OFF\n   77.605s &amp;lt;- OK STREAM OFF\n   77.605s -&amp;gt; FAULT I2C OFF\n   77.899s &amp;lt;- OK FAULT I2C OFF\n   77.899s -&amp;gt; RATE 1000\n   78.207s &amp;lt;- OK RATE 1000\n   78.207s -&amp;gt; CLEAR\n   78.413s &amp;lt;- OK CLEAR\n   78.413s -&amp;gt; STATUS\n   78.623s &amp;lt;- OK STATUS uptime_ms=153767 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   78.836s -&amp;gt; RATE abc\n   79.046s &amp;lt;- ERR ARGS\n   79.046s -&amp;gt; STATUS\n   79.255s &amp;lt;- OK STATUS uptime_ms=153967 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE&#34;}], &#34;tests/test_functional.py::test_rate_rejects_bad_arguments[RATE -5]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_rate_rejects_bad_arguments[RATE -5]&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_rate_rejects_bad_arguments[RATE -5]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   79.467s -&amp;gt; STREAM OFF\n   79.761s &amp;lt;- OK STREAM OFF\n   79.761s -&amp;gt; FAULT I2C OFF\n   80.039s &amp;lt;- OK FAULT I2C OFF\n   80.040s -&amp;gt; RATE 1000\n   80.307s &amp;lt;- OK RATE 1000\n   80.307s -&amp;gt; CLEAR\n   80.550s &amp;lt;- OK CLEAR\n   80.550s -&amp;gt; STATUS\n   80.784s &amp;lt;- OK STATUS uptime_ms=154533 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   80.987s -&amp;gt; RATE -5\n   81.194s &amp;lt;- ERR ARGS\n   81.194s -&amp;gt; STATUS\n   81.427s &amp;lt;- OK STATUS uptime_ms=154800 samples=1 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE&#34;}], &#34;tests/test_functional.py::test_rate_rejects_bad_arguments[RATE 1 2]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_rate_rejects_bad_arguments[RATE 1 2]&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_rate_rejects_bad_arguments[RATE 1 2]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   81.636s -&amp;gt; STREAM OFF\n   81.734s &amp;lt;- OK STREAM OFF\n   81.734s -&amp;gt; FAULT I2C OFF\n   81.956s &amp;lt;- OK FAULT I2C OFF\n   81.956s -&amp;gt; RATE 1000\n   82.169s &amp;lt;- OK RATE 1000\n   82.169s -&amp;gt; CLEAR\n   82.388s &amp;lt;- OK CLEAR\n   82.388s -&amp;gt; STATUS\n   82.603s &amp;lt;- OK STATUS uptime_ms=155333 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   82.817s -&amp;gt; RATE 1 2\n   82.966s &amp;lt;- ERR ARGS\n   82.966s -&amp;gt; STATUS\n   83.191s &amp;lt;- OK STATUS uptime_ms=155600 samples=1 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE&#34;}], &#34;tests/test_functional.py::test_samples_are_spaced_at_rate&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_samples_are_spaced_at_rate&#34;, &#34;duration&#34;: &#34;00:00:05&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_samples_are_spaced_at_rate&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:05&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   83.400s -&amp;gt; STREAM OFF\n   83.544s &amp;lt;- OK STREAM OFF\n   83.544s -&amp;gt; FAULT I2C OFF\n   83.760s &amp;lt;- OK FAULT I2C OFF\n   83.760s -&amp;gt; RATE 1000\n   83.913s &amp;lt;- OK RATE 1000\n   83.913s -&amp;gt; CLEAR\n   84.075s &amp;lt;- OK CLEAR\n   84.076s -&amp;gt; STATUS\n   84.298s &amp;lt;- OK STATUS uptime_ms=156100 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   84.508s -&amp;gt; RATE 200\n   84.591s &amp;lt;- OK RATE 200\n   84.591s -&amp;gt; STREAM ON\n   84.805s &amp;lt;- OK STREAM ON\n   85.012s &amp;lt;- EVT S 156434 24.01\n   85.412s &amp;lt;- EVT S 156634 24.01\n   85.814s &amp;lt;- EVT S 156834 24.01\n   86.226s &amp;lt;- EVT S 157034 24.01\n   86.632s &amp;lt;- EVT S 157234 24.01\n   87.045s &amp;lt;- EVT S 157434 24.01\n   87.430s &amp;lt;- EVT S 157634 24.01\n   87.834s &amp;lt;- EVT S 157834 24.01\n   87.834s -&amp;gt; STREAM OFF\n   88.027s &amp;lt;- OK STREAM OFF&#34;}], &#34;tests/test_functional.py::test_dump_returns_oldest_first_with_rising_timestamps&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_dump_returns_oldest_first_with_rising_timestamps&#34;, &#34;duration&#34;: &#34;00:00:03&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_dump_returns_oldest_first_with_rising_timestamps&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:03&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   88.237s -&amp;gt; STREAM OFF\n   88.452s &amp;lt;- OK STREAM OFF\n   88.453s -&amp;gt; FAULT I2C OFF\n   88.662s &amp;lt;- OK FAULT I2C OFF\n   88.662s -&amp;gt; RATE 1000\n   88.910s &amp;lt;- OK RATE 1000\n   88.910s -&amp;gt; CLEAR\n   89.071s &amp;lt;- OK CLEAR\n   89.071s -&amp;gt; STATUS\n   89.299s &amp;lt;- OK STATUS uptime_ms=158500 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   89.502s -&amp;gt; RATE 100\n   89.575s &amp;lt;- OK RATE 100\n   89.575s -&amp;gt; STREAM ON\n   89.730s &amp;lt;- OK STREAM ON\n   89.806s &amp;lt;- EVT S 158734 24.01\n   90.020s &amp;lt;- EVT S 158834 24.01\n   90.225s &amp;lt;- EVT S 158934 24.01\n   90.435s &amp;lt;- EVT S 159034 24.01\n   90.645s &amp;lt;- EVT S 159134 24.01\n   90.645s -&amp;gt; STREAM OFF\n   90.848s &amp;lt;- OK STREAM OFF\n   90.848s -&amp;gt; DUMP\n   91.052s &amp;lt;- OK DUMP 7\n   91.052s &amp;lt;- S 158634 24.01\n   91.053s &amp;lt;- S 158734 24.01\n   91.053s &amp;lt;- S 158834 24.01\n   91.053s &amp;lt;- S 158934 24.01\n   91.053s &amp;lt;- S 159034 24.01\n   91.053s &amp;lt;- S 159134 24.01\n   91.053s &amp;lt;- S 159234 24.01\n   91.053s &amp;lt;- END&#34;}], &#34;tests/test_functional.py::test_dump_n_returns_the_newest_n&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_dump_n_returns_the_newest_n&#34;, &#34;duration&#34;: &#34;00:00:03&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_dump_n_returns_the_newest_n&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:03&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   91.258s -&amp;gt; STREAM OFF\n   91.402s &amp;lt;- OK STREAM OFF\n   91.402s -&amp;gt; FAULT I2C OFF\n   91.610s &amp;lt;- OK FAULT I2C OFF\n   91.610s -&amp;gt; RATE 1000\n   91.815s &amp;lt;- OK RATE 1000\n   91.815s -&amp;gt; CLEAR\n   92.021s &amp;lt;- OK CLEAR\n   92.021s -&amp;gt; STATUS\n   92.161s &amp;lt;- OK STATUS uptime_ms=159867 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   92.368s -&amp;gt; RATE 100\n   92.495s &amp;lt;- OK RATE 100\n   92.495s -&amp;gt; STREAM ON\n   92.706s &amp;lt;- OK STREAM ON\n   92.706s &amp;lt;- EVT S 160134 24.01\n   92.918s &amp;lt;- EVT S 160234 24.01\n   93.123s &amp;lt;- EVT S 160334 24.01\n   93.338s &amp;lt;- EVT S 160434 24.01\n   93.552s &amp;lt;- EVT S 160534 24.01\n   93.552s -&amp;gt; STREAM OFF\n   93.759s &amp;lt;- OK STREAM OFF\n   93.759s -&amp;gt; RATE 60000\n   93.961s &amp;lt;- OK RATE 60000\n   93.961s -&amp;gt; DUMP\n   94.168s &amp;lt;- OK DUMP 7\n   94.168s &amp;lt;- S 160034 24.01\n   94.169s &amp;lt;- S 160134 24.01\n   94.169s &amp;lt;- S 160234 24.01\n   94.170s &amp;lt;- S 160334 24.01\n   94.170s &amp;lt;- S 160434 24.01\n   94.170s &amp;lt;- S 160534 24.01\n   94.170s &amp;lt;- S 160634 24.01\n   94.170s &amp;lt;- END\n   94.170s -&amp;gt; DUMP 3\n   94.378s &amp;lt;- OK DUMP 3\n   94.379s &amp;lt;- S 160434 24.01\n   94.379s &amp;lt;- S 160534 24.01\n   94.379s &amp;lt;- S 160634 24.01\n   94.379s &amp;lt;- END&#34;}], &#34;tests/test_functional.py::test_clear_empties_the_buffer&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_clear_empties_the_buffer&#34;, &#34;duration&#34;: &#34;00:00:03&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_clear_empties_the_buffer&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:03&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   94.583s -&amp;gt; STREAM OFF\n   94.742s &amp;lt;- OK STREAM OFF\n   94.742s -&amp;gt; FAULT I2C OFF\n   94.897s &amp;lt;- OK FAULT I2C OFF\n   94.897s -&amp;gt; RATE 1000\n   95.052s &amp;lt;- OK RATE 1000\n   95.052s -&amp;gt; CLEAR\n   95.264s &amp;lt;- OK CLEAR\n   95.264s -&amp;gt; STATUS\n   95.428s &amp;lt;- OK STATUS uptime_ms=161400 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   95.641s -&amp;gt; RATE 100\n   95.737s &amp;lt;- OK RATE 100\n   95.737s -&amp;gt; STREAM ON\n   95.951s &amp;lt;- OK STREAM ON\n   95.952s &amp;lt;- EVT S 161634 24.01\n   96.165s &amp;lt;- EVT S 161734 24.01\n   96.387s &amp;lt;- EVT S 161834 24.01\n   96.387s -&amp;gt; STREAM OFF\n   96.609s &amp;lt;- OK STREAM OFF\n   96.609s -&amp;gt; RATE 60000\n   96.824s &amp;lt;- OK RATE 60000\n   96.824s -&amp;gt; CLEAR\n   97.049s &amp;lt;- OK CLEAR\n   97.049s -&amp;gt; DUMP\n   97.282s &amp;lt;- OK DUMP 0\n   97.282s &amp;lt;- END\n   97.282s -&amp;gt; STATUS\n   97.435s &amp;lt;- OK STATUS uptime_ms=162300 samples=0 rate_ms=60000 sensor=OK errors=11 overflows=0 reset=SOFTWARE&#34;}], &#34;tests/test_functional.py::test_stream_on_emits_samples_and_off_stops_them&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_stream_on_emits_samples_and_off_stops_them&#34;, &#34;duration&#34;: &#34;00:00:04&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_stream_on_emits_samples_and_off_stops_them&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:04&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   97.639s -&amp;gt; STREAM OFF\n   97.736s &amp;lt;- OK STREAM OFF\n   97.736s -&amp;gt; FAULT I2C OFF\n   97.954s &amp;lt;- OK FAULT I2C OFF\n   97.954s -&amp;gt; RATE 1000\n   98.159s &amp;lt;- OK RATE 1000\n   98.159s -&amp;gt; CLEAR\n   98.355s &amp;lt;- OK CLEAR\n   98.355s -&amp;gt; STATUS\n   98.489s &amp;lt;- OK STATUS uptime_ms=162800 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n   98.693s -&amp;gt; RATE 100\n   98.769s &amp;lt;- OK RATE 100\n   98.769s -&amp;gt; STREAM ON\n   98.975s &amp;lt;- OK STREAM ON\n   98.975s &amp;lt;- EVT S 163034 24.01\n   98.975s -&amp;gt; STREAM OFF\n   99.190s &amp;lt;- OK STREAM OFF&#34;}], &#34;tests/test_functional.py::test_commands_work_while_streaming&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_functional.py::test_commands_work_while_streaming&#34;, &#34;duration&#34;: &#34;00:00:03&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_functional.py::test_commands_work_while_streaming&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:03&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  101.803s -&amp;gt; STREAM OFF\n  101.879s &amp;lt;- OK STREAM OFF\n  101.879s -&amp;gt; FAULT I2C OFF\n  102.110s &amp;lt;- OK FAULT I2C OFF\n  102.110s -&amp;gt; RATE 1000\n  102.269s &amp;lt;- OK RATE 1000\n  102.269s -&amp;gt; CLEAR\n  102.483s &amp;lt;- OK CLEAR\n  102.483s -&amp;gt; STATUS\n  102.688s &amp;lt;- OK STATUS uptime_ms=164800 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n  102.898s -&amp;gt; RATE 100\n  103.085s &amp;lt;- OK RATE 100\n  103.085s -&amp;gt; STREAM ON\n  103.287s &amp;lt;- OK STREAM ON\n  103.287s -&amp;gt; PING\n  103.287s &amp;lt;- EVT S 165100 24.01\n  103.485s &amp;lt;- OK PONG\n  103.485s -&amp;gt; STATUS\n  103.485s &amp;lt;- EVT S 165200 24.01\n  103.704s &amp;lt;- OK STATUS uptime_ms=165300 samples=3 rate_ms=100 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n  103.704s -&amp;gt; PING\n  103.704s &amp;lt;- EVT S 165300 24.01\n  103.921s &amp;lt;- OK PONG\n  103.921s -&amp;gt; STATUS\n  103.922s &amp;lt;- EVT S 165400 24.01\n  104.141s &amp;lt;- OK STATUS uptime_ms=165500 samples=5 rate_ms=100 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n  104.141s -&amp;gt; PING\n  104.141s &amp;lt;- EVT S 165500 24.01\n  104.362s &amp;lt;- OK PONG\n  104.362s -&amp;gt; STATUS\n  104.362s &amp;lt;- EVT S 165600 24.01\n  104.581s &amp;lt;- OK STATUS uptime_ms=165700 samples=7 rate_ms=100 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n  104.581s -&amp;gt; STREAM OFF\n  104.581s &amp;lt;- EVT S 165700 24.01\n  104.790s &amp;lt;- OK STREAM OFF&#34;}], &#34;tests/test_performance.py::test_ping_latency&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_performance.py::test_ping_latency&#34;, &#34;duration&#34;: &#34;00:00:42&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_performance.py::test_ping_latency&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:42&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- Captured stdout call -----------------------------\nPING latency on wokwi: {&amp;#x27;target&amp;#x27;: &amp;#x27;wokwi&amp;#x27;, &amp;#x27;calls&amp;#x27;: 200, &amp;#x27;p50_ms&amp;#x27;: 206.84, &amp;#x27;p95_ms&amp;#x27;: 230.55, &amp;#x27;max_ms&amp;#x27;: 248.73}\n\n----------------------------- serial conversation ------------------------------\n  104.994s -&amp;gt; STREAM OFF\n  105.186s &amp;lt;- OK STREAM OFF\n  105.186s -&amp;gt; FAULT I2C OFF\n  105.393s &amp;lt;- OK FAULT I2C OFF\n  105.393s -&amp;gt; RATE 1000\n  105.592s &amp;lt;- OK RATE 1000\n  105.592s -&amp;gt; CLEAR\n  105.795s &amp;lt;- OK CLEAR\n  105.795s -&amp;gt; STATUS\n  105.944s &amp;lt;- OK STATUS uptime_ms=166367 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n  106.155s -&amp;gt; PING\n  106.259s &amp;lt;- OK PONG\n  106.259s -&amp;gt; PING\n  106.489s &amp;lt;- OK PONG\n  106.489s -&amp;gt; PING\n  106.723s &amp;lt;- OK PONG\n  106.723s -&amp;gt; PING\n  106.934s &amp;lt;- OK PONG\n  106.934s -&amp;gt; PING\n  107.133s &amp;lt;- OK PONG\n  107.133s -&amp;gt; PING\n  107.331s &amp;lt;- OK PONG\n  107.331s -&amp;gt; PING\n  107.537s &amp;lt;- OK PONG\n  107.537s -&amp;gt; PING\n  107.742s &amp;lt;- OK PONG\n  107.742s -&amp;gt; PING\n  107.924s &amp;lt;- OK PONG\n  107.924s -&amp;gt; PING\n  108.079s &amp;lt;- OK PONG\n  108.079s -&amp;gt; PING\n  108.235s &amp;lt;- OK PONG\n  108.235s -&amp;gt; PING\n  108.476s &amp;lt;- OK PONG\n  108.477s -&amp;gt; PING\n  108.712s &amp;lt;- OK PONG\n  108.713s -&amp;gt; PING\n  108.961s &amp;lt;- OK PONG\n  108.961s -&amp;gt; PING\n  109.179s &amp;lt;- OK PONG\n  109.179s -&amp;gt; PING\n  109.390s &amp;lt;- OK PONG\n  109.390s -&amp;gt; PING\n  109.611s &amp;lt;- OK PONG\n  109.611s -&amp;gt; PING\n  109.841s &amp;lt;- OK PONG\n  109.841s -&amp;gt; PING\n  110.050s &amp;lt;- OK PONG\n  110.050s -&amp;gt; PING\n  110.262s &amp;lt;- OK PONG\n  110.262s -&amp;gt; PING\n  110.480s &amp;lt;- OK PONG\n  110.481s -&amp;gt; PING\n  110.623s &amp;lt;- OK PONG\n  110.623s -&amp;gt; PING\n  110.832s &amp;lt;- OK PONG\n  110.832s -&amp;gt; PING\n  111.046s &amp;lt;- OK PONG\n  111.046s -&amp;gt; PING\n  111.214s &amp;lt;- OK PONG\n  111.214s -&amp;gt; PING\n  111.426s &amp;lt;- OK PONG\n  111.426s -&amp;gt; PING\n  111.630s &amp;lt;- OK PONG\n  111.630s -&amp;gt; PING\n  111.828s &amp;lt;- OK PONG\n  111.828s -&amp;gt; PING\n  112.034s &amp;lt;- OK PONG\n  112.034s -&amp;gt; PING\n  112.247s &amp;lt;- OK PONG\n  112.247s -&amp;gt; PING\n  112.445s &amp;lt;- OK PONG\n  112.445s -&amp;gt; PING\n  112.655s &amp;lt;- OK PONG\n  112.655s -&amp;gt; PING\n  112.864s &amp;lt;- OK PONG\n  112.864s -&amp;gt; PING\n  113.071s &amp;lt;- OK PONG\n  113.071s -&amp;gt; PING\n  113.291s &amp;lt;- OK PONG\n  113.291s -&amp;gt; PING\n  113.497s &amp;lt;- OK PONG\n  113.497s -&amp;gt; PING\n  113.699s &amp;lt;- OK PONG\n  113.699s -&amp;gt; PING\n  113.900s &amp;lt;- OK PONG\n  113.900s -&amp;gt; PING\n  114.107s &amp;lt;- OK PONG\n  114.107s -&amp;gt; PING\n  114.311s &amp;lt;- OK PONG\n  114.311s -&amp;gt; PING\n  114.506s &amp;lt;- OK PONG\n  114.506s -&amp;gt; PING\n  114.712s &amp;lt;- OK PONG\n  114.712s -&amp;gt; PING\n  114.858s &amp;lt;- OK PONG\n  114.858s -&amp;gt; PING\n  115.076s &amp;lt;- OK PONG\n  115.076s -&amp;gt; PING\n  115.286s &amp;lt;- OK PONG\n  115.286s -&amp;gt; PING\n  115.507s &amp;lt;- OK PONG\n  115.507s -&amp;gt; PING\n  115.713s &amp;lt;- OK PONG\n  115.713s -&amp;gt; PING\n  115.878s &amp;lt;- OK PONG\n  115.878s -&amp;gt; PING\n  116.021s &amp;lt;- OK PONG\n  116.021s -&amp;gt; PING\n  116.228s &amp;lt;- OK PONG\n  116.228s -&amp;gt; PING\n  116.439s &amp;lt;- OK PONG\n  116.439s -&amp;gt; PING\n  116.643s &amp;lt;- OK PONG\n  116.643s -&amp;gt; PING\n  116.845s &amp;lt;- OK PONG\n  116.845s -&amp;gt; PING\n  117.059s &amp;lt;- OK PONG\n  117.059s -&amp;gt; PING\n  117.269s &amp;lt;- OK PONG\n  117.269s -&amp;gt; PING\n  117.477s &amp;lt;- OK PONG\n  117.477s -&amp;gt; PING\n  117.693s &amp;lt;- OK PONG\n  117.693s -&amp;gt; PING\n  117.831s &amp;lt;- OK PONG\n  117.831s -&amp;gt; PING\n  118.035s &amp;lt;- OK PONG\n  118.035s -&amp;gt; PING\n  118.229s &amp;lt;- OK PONG\n  118.229s -&amp;gt; PING\n  118.426s &amp;lt;- OK PONG\n  118.426s -&amp;gt; PING\n  118.641s &amp;lt;- OK PONG\n  118.641s -&amp;gt; PING\n  118.844s &amp;lt;- OK PONG\n  118.844s -&amp;gt; PING\n  119.052s &amp;lt;- OK PONG\n  119.052s -&amp;gt; PING\n  119.277s &amp;lt;- OK PONG\n  119.277s -&amp;gt; PING\n  119.426s &amp;lt;- OK PONG\n  119.426s -&amp;gt; PING\n  119.638s &amp;lt;- OK PONG\n  119.638s -&amp;gt; PING\n  119.863s &amp;lt;- OK PONG\n  119.863s -&amp;gt; PING\n  120.018s &amp;lt;- OK PONG\n  120.018s -&amp;gt; PING\n  120.225s &amp;lt;- OK PONG\n  120.225s -&amp;gt; PING\n  120.429s &amp;lt;- OK PONG\n  120.429s -&amp;gt; PING\n  120.633s &amp;lt;- OK PONG\n  120.633s -&amp;gt; PING\n  120.840s &amp;lt;- OK PONG\n  120.840s -&amp;gt; PING\n  121.042s &amp;lt;- OK PONG\n  121.042s -&amp;gt; PING\n  121.177s &amp;lt;- OK PONG\n  121.177s -&amp;gt; PING\n  121.395s &amp;lt;- OK PONG\n  121.395s -&amp;gt; PING\n  121.606s &amp;lt;- OK PONG\n  121.606s -&amp;gt; PING\n  121.768s &amp;lt;- OK PONG\n  121.768s -&amp;gt; PING\n  121.998s &amp;lt;- OK PONG\n  121.998s -&amp;gt; PING\n  122.148s &amp;lt;- OK PONG\n  122.148s -&amp;gt; PING\n  122.290s &amp;lt;- OK PONG\n  122.290s -&amp;gt; PING\n  122.500s &amp;lt;- OK PONG\n  122.500s -&amp;gt; PING\n  122.701s &amp;lt;- OK PONG\n  122.701s -&amp;gt; PING\n  122.907s &amp;lt;- OK PONG\n  122.907s -&amp;gt; PING\n  123.112s &amp;lt;- OK PONG\n  123.112s -&amp;gt; PING\n  123.314s &amp;lt;- OK PONG\n  123.314s -&amp;gt; PING\n  123.523s &amp;lt;- OK PONG\n  123.523s -&amp;gt; PING\n  123.743s &amp;lt;- OK PONG\n  123.743s -&amp;gt; PING\n  123.955s &amp;lt;- OK PONG\n  123.955s -&amp;gt; PING\n  124.180s &amp;lt;- OK PONG\n  124.180s -&amp;gt; PING\n  124.401s &amp;lt;- OK PONG\n  124.401s -&amp;gt; PING\n  124.612s &amp;lt;- OK PONG\n  124.612s -&amp;gt; PING\n  124.824s &amp;lt;- OK PONG\n  124.824s -&amp;gt; PING\n  125.023s &amp;lt;- OK PONG\n  125.023s -&amp;gt; PING\n  125.229s &amp;lt;- OK PONG\n  125.229s -&amp;gt; PING\n  125.432s &amp;lt;- OK PONG\n  125.432s -&amp;gt; PING\n  125.632s &amp;lt;- OK PONG\n  125.632s -&amp;gt; PING\n  125.844s &amp;lt;- OK PONG\n  125.844s -&amp;gt; PING\n  126.054s &amp;lt;- OK PONG\n  126.054s -&amp;gt; PING\n  126.260s &amp;lt;- OK PONG\n  126.260s -&amp;gt; PING\n  126.480s &amp;lt;- OK PONG\n  126.480s -&amp;gt; PING\n  126.638s &amp;lt;- OK PONG\n  126.638s -&amp;gt; PING\n  126.856s &amp;lt;- OK PONG\n  126.856s -&amp;gt; PING\n  127.064s &amp;lt;- OK PONG\n  127.064s -&amp;gt; PING\n  127.201s &amp;lt;- OK PONG\n  127.201s -&amp;gt; PING\n  127.411s &amp;lt;- OK PONG\n  127.411s -&amp;gt; PING\n  127.616s &amp;lt;- OK PONG\n  127.616s -&amp;gt; PING\n  127.822s &amp;lt;- OK PONG\n  127.822s -&amp;gt; PING\n  128.033s &amp;lt;- OK PONG\n  128.033s -&amp;gt; PING\n  128.248s &amp;lt;- OK PONG\n  128.248s -&amp;gt; PING\n  128.459s &amp;lt;- OK PONG\n  128.459s -&amp;gt; PING\n  128.678s &amp;lt;- OK PONG\n  128.678s -&amp;gt; PING\n  128.892s &amp;lt;- OK PONG\n  128.892s -&amp;gt; PING\n  129.124s &amp;lt;- OK PONG\n  129.124s -&amp;gt; PING\n  129.290s &amp;lt;- OK PONG\n  129.290s -&amp;gt; PING\n  129.527s &amp;lt;- OK PONG\n  129.527s -&amp;gt; PING\n  129.676s &amp;lt;- OK PONG\n  129.676s -&amp;gt; PING\n  129.888s &amp;lt;- OK PONG\n  129.888s -&amp;gt; PING\n  130.103s &amp;lt;- OK PONG\n  130.103s -&amp;gt; PING\n  130.265s &amp;lt;- OK PONG\n  130.265s -&amp;gt; PING\n  130.420s &amp;lt;- OK PONG\n  130.420s -&amp;gt; PING\n  130.652s &amp;lt;- OK PONG\n  130.652s -&amp;gt; PING\n  130.896s &amp;lt;- OK PONG\n  130.896s -&amp;gt; PING\n  131.055s &amp;lt;- OK PONG\n  131.055s -&amp;gt; PING\n  131.285s &amp;lt;- OK PONG\n  131.285s -&amp;gt; PING\n  131.498s &amp;lt;- OK PONG\n  131.498s -&amp;gt; PING\n  131.706s &amp;lt;- OK PONG\n  131.706s -&amp;gt; PING\n  131.916s &amp;lt;- OK PONG\n  131.916s -&amp;gt; PING\n  132.115s &amp;lt;- OK PONG\n  132.115s -&amp;gt; PING\n  132.325s &amp;lt;- OK PONG\n  132.325s -&amp;gt; PING\n  132.543s &amp;lt;- OK PONG\n  132.543s -&amp;gt; PING\n  132.707s &amp;lt;- OK PONG\n  132.707s -&amp;gt; PING\n  132.927s &amp;lt;- OK PONG\n  132.927s -&amp;gt; PING\n  133.148s &amp;lt;- OK PONG\n  133.149s -&amp;gt; PING\n  133.362s &amp;lt;- OK PONG\n  133.362s -&amp;gt; PING\n  133.564s &amp;lt;- OK PONG\n  133.564s -&amp;gt; PING\n  133.764s &amp;lt;- OK PONG\n  133.764s -&amp;gt; PING\n  133.977s &amp;lt;- OK PONG\n  133.977s -&amp;gt; PING\n  134.186s &amp;lt;- OK PONG\n  134.186s -&amp;gt; PING\n  134.388s &amp;lt;- OK PONG\n  134.388s -&amp;gt; PING\n  134.600s &amp;lt;- OK PONG\n  134.600s -&amp;gt; PING\n  134.815s &amp;lt;- OK PONG\n  134.815s -&amp;gt; PING\n  135.022s &amp;lt;- OK PONG\n  135.022s -&amp;gt; PING\n  135.234s &amp;lt;- OK PONG\n  135.234s -&amp;gt; PING\n  135.448s &amp;lt;- OK PONG\n  135.448s -&amp;gt; PING\n  135.585s &amp;lt;- OK PONG\n  135.585s -&amp;gt; PING\n  135.782s &amp;lt;- OK PONG\n  135.782s -&amp;gt; PING\n  135.979s &amp;lt;- OK PONG\n  135.979s -&amp;gt; PING\n  136.184s &amp;lt;- OK PONG\n  136.184s -&amp;gt; PING\n  136.386s &amp;lt;- OK PONG\n  136.386s -&amp;gt; PING\n  136.585s &amp;lt;- OK PONG\n  136.585s -&amp;gt; PING\n  136.793s &amp;lt;- OK PONG\n  136.793s -&amp;gt; PING\n  137.001s &amp;lt;- OK PONG\n  137.001s -&amp;gt; PING\n  137.203s &amp;lt;- OK PONG\n  137.203s -&amp;gt; PING\n  137.412s &amp;lt;- OK PONG\n  137.412s -&amp;gt; PING\n  137.624s &amp;lt;- OK PONG\n  137.624s -&amp;gt; PING\n  137.829s &amp;lt;- OK PONG\n  137.829s -&amp;gt; PING\n  138.029s &amp;lt;- OK PONG\n  138.029s -&amp;gt; PING\n  138.227s &amp;lt;- OK PONG\n  138.227s -&amp;gt; PING\n  138.432s &amp;lt;- OK PONG\n  138.432s -&amp;gt; PING\n  138.637s &amp;lt;- OK PONG\n  138.637s -&amp;gt; PING\n  138.881s &amp;lt;- OK PONG\n  138.881s -&amp;gt; PING\n  139.127s &amp;lt;- OK PONG\n  139.128s -&amp;gt; PING\n  139.281s &amp;lt;- OK PONG\n  139.281s -&amp;gt; PING\n  139.425s &amp;lt;- OK PONG\n  139.425s -&amp;gt; PING\n  139.648s &amp;lt;- OK PONG\n  139.648s -&amp;gt; PING\n  139.797s &amp;lt;- OK PONG\n  139.797s -&amp;gt; PING\n  139.937s &amp;lt;- OK PONG\n  139.937s -&amp;gt; PING\n  140.137s &amp;lt;- OK PONG\n  140.137s -&amp;gt; PING\n  140.342s &amp;lt;- OK PONG\n  140.342s -&amp;gt; PING\n  140.557s &amp;lt;- OK PONG\n  140.557s -&amp;gt; PING\n  140.770s &amp;lt;- OK PONG\n  140.770s -&amp;gt; PING\n  140.970s &amp;lt;- OK PONG\n  140.970s -&amp;gt; PING\n  141.179s &amp;lt;- OK PONG\n  141.179s -&amp;gt; PING\n  141.322s &amp;lt;- OK PONG\n  141.322s -&amp;gt; PING\n  141.532s &amp;lt;- OK PONG\n  141.532s -&amp;gt; PING\n  141.736s &amp;lt;- OK PONG\n  141.736s -&amp;gt; PING\n  141.952s &amp;lt;- OK PONG\n  141.952s -&amp;gt; PING\n  142.157s &amp;lt;- OK PONG\n  142.157s -&amp;gt; PING\n  142.352s &amp;lt;- OK PONG\n  142.352s -&amp;gt; PING\n  142.556s &amp;lt;- OK PONG\n  142.556s -&amp;gt; PING\n  142.759s &amp;lt;- OK PONG\n  142.759s -&amp;gt; PING\n  142.963s &amp;lt;- OK PONG\n  142.963s -&amp;gt; PING\n  143.160s &amp;lt;- OK PONG\n  143.160s -&amp;gt; PING\n  143.363s &amp;lt;- OK PONG\n  143.363s -&amp;gt; PING\n  143.576s &amp;lt;- OK PONG\n  143.576s -&amp;gt; PING\n  143.787s &amp;lt;- OK PONG\n  143.787s -&amp;gt; PING\n  144.003s &amp;lt;- OK PONG\n  144.003s -&amp;gt; PING\n  144.220s &amp;lt;- OK PONG\n  144.220s -&amp;gt; PING\n  144.425s &amp;lt;- OK PONG\n  144.425s -&amp;gt; PING\n  144.628s &amp;lt;- OK PONG\n  144.628s -&amp;gt; PING\n  144.790s &amp;lt;- OK PONG\n  144.790s -&amp;gt; PING\n  145.012s &amp;lt;- OK PONG\n  145.012s -&amp;gt; PING\n  145.153s &amp;lt;- OK PONG\n  145.153s -&amp;gt; PING\n  145.354s &amp;lt;- OK PONG\n  145.354s -&amp;gt; PING\n  145.559s &amp;lt;- OK PONG\n  145.559s -&amp;gt; PING\n  145.708s &amp;lt;- OK PONG\n  145.708s -&amp;gt; PING\n  145.880s &amp;lt;- OK PONG\n  145.880s -&amp;gt; PING\n  146.106s &amp;lt;- OK PONG\n  146.106s -&amp;gt; PING\n  146.334s &amp;lt;- OK PONG&#34;}], &#34;tests/test_resets.py::test_reset_reboots_with_software_reason_and_defaults&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_resets.py::test_reset_reboots_with_software_reason_and_defaults&#34;, &#34;duration&#34;: &#34;00:00:09&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_resets.py::test_reset_reboots_with_software_reason_and_defaults&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:09&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  146.541s -&amp;gt; STREAM OFF\n  146.676s &amp;lt;- OK STREAM OFF\n  146.676s -&amp;gt; FAULT I2C OFF\n  146.876s &amp;lt;- OK FAULT I2C OFF\n  146.876s -&amp;gt; RATE 1000\n  147.075s &amp;lt;- OK RATE 1000\n  147.075s -&amp;gt; CLEAR\n  147.281s &amp;lt;- OK CLEAR\n  147.281s -&amp;gt; STATUS\n  147.421s &amp;lt;- OK STATUS uptime_ms=185833 samples=0 rate_ms=1000 sensor=OK errors=11 overflows=0 reset=SOFTWARE\n  147.632s -&amp;gt; RATE 500\n  147.766s &amp;lt;- OK RATE 500\n  147.766s -&amp;gt; STREAM ON\n  147.924s &amp;lt;- OK STREAM ON\n  147.924s -&amp;gt; RESET\n  148.106s &amp;lt;- OK RESET\n  148.107s &amp;lt;- ets Jul 29 2019 12:21:46\n  148.107s &amp;lt;- \n  148.107s &amp;lt;- rst:0xc (SW_CPU_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)\n  148.107s &amp;lt;- configsip: 0, SPIWP:0xee\n  148.108s &amp;lt;- clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00\n  148.108s &amp;lt;- mode:DIO, clock div:2\n  148.108s &amp;lt;- load:0x3fff0030,len:1156\n  148.109s &amp;lt;- load:0x40078000,len:11456\n  148.109s &amp;lt;- ho 0 tail 12 room 4\n  148.109s &amp;lt;- load:0x40080400,len:2972\n  148.109s &amp;lt;- entry 0x400805dc\n  148.704s &amp;lt;- BOOT fw=1.0.0 reset=SOFTWARE\n  148.704s -&amp;gt; STATUS\n  148.922s &amp;lt;- OK STATUS uptime_ms=186766 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE&#34;}], &#34;tests/test_resets.py::test_hang_triggers_watchdog_reset&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_resets.py::test_hang_triggers_watchdog_reset&#34;, &#34;duration&#34;: &#34;00:00:14&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_resets.py::test_hang_triggers_watchdog_reset&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:14&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  155.150s -&amp;gt; STREAM OFF\n  155.269s &amp;lt;- OK STREAM OFF\n  155.270s -&amp;gt; FAULT I2C OFF\n  155.480s &amp;lt;- OK FAULT I2C OFF\n  155.480s -&amp;gt; RATE 1000\n  155.687s &amp;lt;- OK RATE 1000\n  155.687s -&amp;gt; CLEAR\n  155.899s &amp;lt;- OK CLEAR\n  155.899s -&amp;gt; STATUS\n  156.110s &amp;lt;- OK STATUS uptime_ms=190200 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  156.317s -&amp;gt; FAULT HANG\n  156.397s &amp;lt;- OK FAULT HANG\n  159.521s &amp;lt;- E (18128) task_wdt: Task watchdog got triggered. The following tasks did not reset the watchdog in time:\n  159.521s &amp;lt;- E (18128) task_wdt:  - loopTask (CPU 1)\n  159.901s &amp;lt;- E (18128) task_wdt: Tasks currently running:\n  159.901s &amp;lt;- E (18128) task_wdt: CPU 0: IDLE0\n  159.901s &amp;lt;- E (18128) task_wdt: CPU 1: IDLE1\n  159.902s &amp;lt;- E (18128) task_wdt: Aborting.\n  159.902s &amp;lt;- \n  159.903s &amp;lt;- abort() was called at PC 0x400dc451 on core 0\n  159.903s &amp;lt;- \n  159.903s &amp;lt;- \n  159.904s &amp;lt;- Backtrace: 0x40083869:0x3ffbea9c |&amp;lt;-CORRUPTED\n  159.904s &amp;lt;- \n  159.904s &amp;lt;- \n  159.904s &amp;lt;- \n  159.904s &amp;lt;- \n  159.904s &amp;lt;- ELF file SHA256: 7aba770bdf1e5243\n  159.904s &amp;lt;- \n  167.596s &amp;lt;- ets Jul 29 2019 12:21:46\n  167.596s &amp;lt;- \n  167.596s &amp;lt;- rst:0x8 (TG1WDT_SYS_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)\n  167.596s &amp;lt;- configsip: 0, SPIWP:0xee\n  167.597s &amp;lt;- clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00\n  167.606s &amp;lt;- mode:DIO, clock div:2\n  167.606s &amp;lt;- load:0x3fff0030,len:1156\n  167.606s &amp;lt;- load:0x40078000,len:11456\n  167.607s &amp;lt;- ho 0 tail 12 room 4\n  167.620s &amp;lt;- load:0x40080400,len:2972\n  167.620s &amp;lt;- entry 0x400805dc\n  168.270s &amp;lt;- BOOT fw=1.0.0 reset=WATCHDOG\n  168.270s -&amp;gt; PING\n  168.554s &amp;lt;- OK PONG&#34;}], &#34;tests/test_resets.py::test_commands_queued_behind_reset_are_dropped&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_resets.py::test_commands_queued_behind_reset_are_dropped&#34;, &#34;duration&#34;: &#34;00:00:03&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_resets.py::test_commands_queued_behind_reset_are_dropped&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:03&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  168.764s -&amp;gt; STREAM OFF\n  169.008s &amp;lt;- OK STREAM OFF\n  169.008s -&amp;gt; FAULT I2C OFF\n  169.301s &amp;lt;- OK FAULT I2C OFF\n  169.301s -&amp;gt; RATE 1000\n  169.567s &amp;lt;- OK RATE 1000\n  169.567s -&amp;gt; CLEAR\n  169.825s &amp;lt;- OK CLEAR\n  169.825s -&amp;gt; STATUS\n  170.094s &amp;lt;- OK STATUS uptime_ms=195200 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=WATCHDOG\n  170.306s -&amp;gt; &amp;lt;20 raw bytes&amp;gt; b&amp;#x27;RESET\\nRATE 500\\nPING\\n&amp;#x27;\n  170.507s &amp;lt;- OK RESET\n  170.508s &amp;lt;- ets Jul 29 2019 12:21:46\n  170.508s &amp;lt;- \n  170.508s &amp;lt;- rst:0xc (SW_CPU_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)\n  170.508s &amp;lt;- configsip: 0, SPIWP:0xee\n  170.509s &amp;lt;- clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00\n  170.509s &amp;lt;- mode:DIO, clock div:2\n  170.510s &amp;lt;- load:0x3fff0030,len:1156\n  170.510s &amp;lt;- load:0x40078000,len:11456\n  170.510s &amp;lt;- ho 0 tail 12 room 4\n  170.510s &amp;lt;- load:0x40080400,len:2972\n  170.549s &amp;lt;- entry 0x400805dc\n  171.198s &amp;lt;- BOOT fw=1.0.0 reset=SOFTWARE\n  171.198s -&amp;gt; STATUS\n  171.460s &amp;lt;- OK STATUS uptime_ms=195966 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE&#34;}], &#34;tests/test_resets.py::test_uptime_restarts_after_reset&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;XFailed&#34;, &#34;testId&#34;: &#34;tests/test_resets.py::test_uptime_restarts_after_reset&#34;, &#34;duration&#34;: &#34;00:00:03&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;XFailed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_resets.py::test_uptime_restarts_after_reset&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:03&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;device = &amp;lt;embedded_hil.device.DeviceClient object at 0x000001C8BDB65F40&amp;gt;\n\n    @pytest.mark.wokwi_limit(reason=&amp;quot;Wokwi does not restart millis() on a software reset (docs/bugs/002)&amp;quot;)\n    def test_uptime_restarts_after_reset(device):\n        &amp;quot;&amp;quot;&amp;quot;HIL-RS-04: uptime_ms starts again from 0 after RESET (real ESP32 behaviour).&amp;quot;&amp;quot;&amp;quot;\n        device.expect_ok(&amp;quot;RESET&amp;quot;)\n        device.wait_for_boot(5)\n&amp;gt;       assert device.status()[&amp;quot;uptime_ms&amp;quot;] &amp;lt; 2000\nE       assert 197298 &amp;lt; 2000\n\ntests\\test_resets.py:46: AssertionError\n\n----------------------------- serial conversation ------------------------------\n  171.665s -&amp;gt; STREAM OFF\n  171.881s &amp;lt;- OK STREAM OFF\n  171.881s -&amp;gt; FAULT I2C OFF\n  172.152s &amp;lt;- OK FAULT I2C OFF\n  172.152s -&amp;gt; RATE 1000\n  172.453s &amp;lt;- OK RATE 1000\n  172.453s -&amp;gt; CLEAR\n  172.745s &amp;lt;- OK CLEAR\n  172.745s -&amp;gt; STATUS\n  173.025s &amp;lt;- OK STATUS uptime_ms=196532 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  173.228s -&amp;gt; RESET\n  173.408s &amp;lt;- OK RESET\n  173.409s &amp;lt;- ets Jul 29 2019 12:21:46\n  173.409s &amp;lt;- \n  173.410s &amp;lt;- rst:0xc (SW_CPU_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)\n  173.410s &amp;lt;- configsip: 0, SPIWP:0xee\n  173.411s &amp;lt;- clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00\n  173.411s &amp;lt;- mode:DIO, clock div:2\n  173.411s &amp;lt;- load:0x3fff0030,len:1156\n  173.411s &amp;lt;- load:0x40078000,len:11456\n  173.412s &amp;lt;- ho 0 tail 12 room 4\n  173.412s &amp;lt;- load:0x40080400,len:2972\n  173.412s &amp;lt;- entry 0x400805dc\n  174.103s &amp;lt;- BOOT fw=1.0.0 reset=SOFTWARE\n  174.103s -&amp;gt; STATUS\n  174.392s &amp;lt;- OK STATUS uptime_ms=197298 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE&#34;}], &#34;tests/test_robustness.py::test_unknown_commands_get_err_unknown[HELLO]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_robustness.py::test_unknown_commands_get_err_unknown[HELLO]&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_robustness.py::test_unknown_commands_get_err_unknown[HELLO]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  174.698s -&amp;gt; STREAM OFF\n  174.992s &amp;lt;- OK STREAM OFF\n  174.992s -&amp;gt; FAULT I2C OFF\n  175.208s &amp;lt;- OK FAULT I2C OFF\n  175.208s -&amp;gt; RATE 1000\n  175.495s &amp;lt;- OK RATE 1000\n  175.495s -&amp;gt; CLEAR\n  175.679s &amp;lt;- OK CLEAR\n  175.679s -&amp;gt; STATUS\n  175.953s &amp;lt;- OK STATUS uptime_ms=197832 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  176.158s -&amp;gt; HELLO\n  176.394s &amp;lt;- ERR UNKNOWN&#34;}], &#34;tests/test_robustness.py::test_unknown_commands_get_err_unknown[ping]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_robustness.py::test_unknown_commands_get_err_unknown[ping]&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_robustness.py::test_unknown_commands_get_err_unknown[ping]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  176.598s -&amp;gt; STREAM OFF\n  176.854s &amp;lt;- OK STREAM OFF\n  176.854s -&amp;gt; FAULT I2C OFF\n  177.136s &amp;lt;- OK FAULT I2C OFF\n  177.136s -&amp;gt; RATE 1000\n  177.330s &amp;lt;- OK RATE 1000\n  177.330s -&amp;gt; CLEAR\n  177.609s &amp;lt;- OK CLEAR\n  177.609s -&amp;gt; STATUS\n  177.906s &amp;lt;- OK STATUS uptime_ms=198532 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  178.117s -&amp;gt; ping\n  178.394s &amp;lt;- ERR UNKNOWN&#34;}], &#34;tests/test_robustness.py::test_unknown_commands_get_err_unknown[P1NG]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_robustness.py::test_unknown_commands_get_err_unknown[P1NG]&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_robustness.py::test_unknown_commands_get_err_unknown[P1NG]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  178.607s -&amp;gt; STREAM OFF\n  178.864s &amp;lt;- OK STREAM OFF\n  178.864s -&amp;gt; FAULT I2C OFF\n  179.162s &amp;lt;- OK FAULT I2C OFF\n  179.162s -&amp;gt; RATE 1000\n  179.363s &amp;lt;- OK RATE 1000\n  179.363s -&amp;gt; CLEAR\n  179.673s &amp;lt;- OK CLEAR\n  179.673s -&amp;gt; STATUS\n  179.951s &amp;lt;- OK STATUS uptime_ms=199232 samples=1 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  180.167s -&amp;gt; P1NG\n  180.406s &amp;lt;- ERR UNKNOWN&#34;}], &#34;tests/test_robustness.py::test_overlong_line_rejected_then_parser_recovers&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_robustness.py::test_overlong_line_rejected_then_parser_recovers&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_robustness.py::test_overlong_line_rejected_then_parser_recovers&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  180.616s -&amp;gt; STREAM OFF\n  180.765s &amp;lt;- OK STREAM OFF\n  180.765s -&amp;gt; FAULT I2C OFF\n  181.046s &amp;lt;- OK FAULT I2C OFF\n  181.046s -&amp;gt; RATE 1000\n  181.351s &amp;lt;- OK RATE 1000\n  181.351s -&amp;gt; CLEAR\n  181.633s &amp;lt;- OK CLEAR\n  181.633s -&amp;gt; STATUS\n  181.915s &amp;lt;- OK STATUS uptime_ms=199932 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  182.130s -&amp;gt; AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n  182.351s &amp;lt;- ERR UNKNOWN\n  182.351s -&amp;gt; AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n  182.621s &amp;lt;- ERR TOOLONG\n  182.621s -&amp;gt; PING\n  182.873s &amp;lt;- OK PONG&#34;}], &#34;tests/test_robustness.py::test_every_line_ending_gives_exactly_one_response[LF]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_robustness.py::test_every_line_ending_gives_exactly_one_response[LF]&#34;, &#34;duration&#34;: &#34;00:00:03&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_robustness.py::test_every_line_ending_gives_exactly_one_response[LF]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:03&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  183.085s -&amp;gt; STREAM OFF\n  183.325s &amp;lt;- OK STREAM OFF\n  183.325s -&amp;gt; FAULT I2C OFF\n  183.593s &amp;lt;- OK FAULT I2C OFF\n  183.593s -&amp;gt; RATE 1000\n  183.764s &amp;lt;- OK RATE 1000\n  183.764s -&amp;gt; CLEAR\n  183.942s &amp;lt;- OK CLEAR\n  183.942s -&amp;gt; STATUS\n  184.204s &amp;lt;- OK STATUS uptime_ms=200798 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  184.416s -&amp;gt; &amp;lt;5 raw bytes&amp;gt; b&amp;#x27;PING\\n&amp;#x27;\n  184.724s &amp;lt;- OK PONG&#34;}], &#34;tests/test_robustness.py::test_every_line_ending_gives_exactly_one_response[CRLF]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_robustness.py::test_every_line_ending_gives_exactly_one_response[CRLF]&#34;, &#34;duration&#34;: &#34;00:00:03&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_robustness.py::test_every_line_ending_gives_exactly_one_response[CRLF]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:03&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  186.146s -&amp;gt; STREAM OFF\n  186.341s &amp;lt;- OK STREAM OFF\n  186.341s -&amp;gt; FAULT I2C OFF\n  186.592s &amp;lt;- OK FAULT I2C OFF\n  186.592s -&amp;gt; RATE 1000\n  186.745s &amp;lt;- OK RATE 1000\n  186.745s -&amp;gt; CLEAR\n  186.993s &amp;lt;- OK CLEAR\n  186.993s -&amp;gt; STATUS\n  187.247s &amp;lt;- OK STATUS uptime_ms=201965 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  187.457s -&amp;gt; &amp;lt;6 raw bytes&amp;gt; b&amp;#x27;PING\\r\\n&amp;#x27;\n  187.629s &amp;lt;- OK PONG&#34;}], &#34;tests/test_robustness.py::test_every_line_ending_gives_exactly_one_response[CR]&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_robustness.py::test_every_line_ending_gives_exactly_one_response[CR]&#34;, &#34;duration&#34;: &#34;00:00:03&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_robustness.py::test_every_line_ending_gives_exactly_one_response[CR]&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:03&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  189.056s -&amp;gt; STREAM OFF\n  189.256s &amp;lt;- OK STREAM OFF\n  189.256s -&amp;gt; FAULT I2C OFF\n  189.497s &amp;lt;- OK FAULT I2C OFF\n  189.497s -&amp;gt; RATE 1000\n  189.665s &amp;lt;- OK RATE 1000\n  189.665s -&amp;gt; CLEAR\n  189.906s &amp;lt;- OK CLEAR\n  189.906s -&amp;gt; STATUS\n  190.063s &amp;lt;- OK STATUS uptime_ms=203132 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  190.266s -&amp;gt; &amp;lt;5 raw bytes&amp;gt; b&amp;#x27;PING\\r&amp;#x27;\n  190.439s &amp;lt;- OK PONG&#34;}], &#34;tests/test_robustness.py::test_binary_garbage_does_not_break_the_parser&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_robustness.py::test_binary_garbage_does_not_break_the_parser&#34;, &#34;duration&#34;: &#34;00:00:05&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_robustness.py::test_binary_garbage_does_not_break_the_parser&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:05&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  191.849s -&amp;gt; STREAM OFF\n  192.023s &amp;lt;- OK STREAM OFF\n  192.023s -&amp;gt; FAULT I2C OFF\n  192.248s &amp;lt;- OK FAULT I2C OFF\n  192.248s -&amp;gt; RATE 1000\n  192.390s &amp;lt;- OK RATE 1000\n  192.390s -&amp;gt; CLEAR\n  192.601s &amp;lt;- OK CLEAR\n  192.601s -&amp;gt; STATUS\n  192.825s &amp;lt;- OK STATUS uptime_ms=204432 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  193.033s -&amp;gt; &amp;lt;2049 raw bytes&amp;gt; b&amp;#x27;\\x9a\\x0c\\xf3R\\xb4Z\\xe7b0\\x17z_L(\\xfdQ\\xac\\xaeF\\xba\\xec\\xbbY\\x16\\xd9\\x04\\xb8\\x99\\xa6\\xb4\\xc2\\xa6,k1\\x11\\xd00\\xe3\\xe5&amp;#x27;...\n  193.574s &amp;lt;- ERR TOOLONG\n  193.574s &amp;lt;- ERR TOOLONG\n  193.574s &amp;lt;- ERR TOOLONG\n  193.651s &amp;lt;- ERR TOOLONG\n  193.776s &amp;lt;- ERR UNKNOWN\n  193.776s &amp;lt;- ERR TOOLONG\n  193.776s &amp;lt;- ERR TOOLONG\n  193.776s &amp;lt;- ERR TOOLONG\n  193.880s &amp;lt;- ERR UNKNOWN\n  193.880s &amp;lt;- ERR TOOLONG\n  193.880s &amp;lt;- ERR UNKNOWN\n  193.975s &amp;lt;- ERR TOOLONG\n  193.975s &amp;lt;- ERR TOOLONG\n  193.975s &amp;lt;- ERR TOOLONG\n  194.056s &amp;lt;- ERR TOOLONG\n  196.064s -&amp;gt; PING\n  196.215s &amp;lt;- OK PONG&#34;}], &#34;tests/test_robustness.py::test_flood_of_100_commands_all_answered_in_order&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_robustness.py::test_flood_of_100_commands_all_answered_in_order&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_robustness.py::test_flood_of_100_commands_all_answered_in_order&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  196.421s -&amp;gt; STREAM OFF\n  196.577s &amp;lt;- OK STREAM OFF\n  196.577s -&amp;gt; FAULT I2C OFF\n  196.789s &amp;lt;- OK FAULT I2C OFF\n  196.789s -&amp;gt; RATE 1000\n  196.996s &amp;lt;- OK RATE 1000\n  196.996s -&amp;gt; CLEAR\n  197.214s &amp;lt;- OK CLEAR\n  197.214s -&amp;gt; STATUS\n  197.426s &amp;lt;- OK STATUS uptime_ms=206432 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  197.628s -&amp;gt; &amp;lt;650 raw bytes&amp;gt; b&amp;#x27;PING\\nVERSION\\nPING\\nVERSION\\nPING\\nVERSION\\nP&amp;#x27;...\n  197.923s &amp;lt;- OK PONG\n  197.923s &amp;lt;- OK VERSION 1.0.0\n  197.924s &amp;lt;- OK PONG\n  197.924s &amp;lt;- OK VERSION 1.0.0\n  197.924s &amp;lt;- OK PONG\n  197.924s &amp;lt;- OK VERSION 1.0.0\n  197.924s &amp;lt;- OK PONG\n  197.924s &amp;lt;- OK VERSION 1.0.0\n  197.924s &amp;lt;- OK PONG\n  197.924s &amp;lt;- OK VERSION 1.0.0\n  197.925s &amp;lt;- OK PONG\n  197.925s &amp;lt;- OK VERSION 1.0.0\n  197.925s &amp;lt;- OK PONG\n  197.925s &amp;lt;- OK VERSION 1.0.0\n  197.925s &amp;lt;- OK PONG\n  197.925s &amp;lt;- OK VERSION 1.0.0\n  197.925s &amp;lt;- OK PONG\n  197.925s &amp;lt;- OK VERSION 1.0.0\n  197.925s &amp;lt;- OK PONG\n  197.988s &amp;lt;- OK VERSION 1.0.0\n  197.988s &amp;lt;- OK PONG\n  197.988s &amp;lt;- OK VERSION 1.0.0\n  197.989s &amp;lt;- OK PONG\n  197.989s &amp;lt;- OK VERSION 1.0.0\n  197.989s &amp;lt;- OK PONG\n  197.989s &amp;lt;- OK VERSION 1.0.0\n  197.989s &amp;lt;- OK PONG\n  197.989s &amp;lt;- OK VERSION 1.0.0\n  197.989s &amp;lt;- OK PONG\n  197.989s &amp;lt;- OK VERSION 1.0.0\n  197.989s &amp;lt;- OK PONG\n  197.989s &amp;lt;- OK VERSION 1.0.0\n  197.989s &amp;lt;- OK PONG\n  197.990s &amp;lt;- OK VERSION 1.0.0\n  197.990s &amp;lt;- OK PONG\n  197.990s &amp;lt;- OK VERSION 1.0.0\n  197.990s &amp;lt;- OK PONG\n  197.990s &amp;lt;- OK VERSION 1.0.0\n  197.990s &amp;lt;- OK PONG\n  197.990s &amp;lt;- OK VERSION 1.0.0\n  197.990s &amp;lt;- OK PONG\n  197.990s &amp;lt;- OK VERSION 1.0.0\n  197.991s &amp;lt;- OK PONG\n  197.991s &amp;lt;- OK VERSION 1.0.0\n  197.991s &amp;lt;- OK PONG\n  197.991s &amp;lt;- OK VERSION 1.0.0\n  197.991s &amp;lt;- OK PONG\n  198.049s &amp;lt;- OK VERSION 1.0.0\n  198.049s &amp;lt;- OK PONG\n  198.049s &amp;lt;- OK VERSION 1.0.0\n  198.049s &amp;lt;- OK PONG\n  198.050s &amp;lt;- OK VERSION 1.0.0\n  198.050s &amp;lt;- OK PONG\n  198.050s &amp;lt;- OK VERSION 1.0.0\n  198.051s &amp;lt;- OK PONG\n  198.052s &amp;lt;- OK VERSION 1.0.0\n  198.052s &amp;lt;- OK PONG\n  198.052s &amp;lt;- OK VERSION 1.0.0\n  198.052s &amp;lt;- OK PONG\n  198.052s &amp;lt;- OK VERSION 1.0.0\n  198.053s &amp;lt;- OK PONG\n  198.053s &amp;lt;- OK VERSION 1.0.0\n  198.053s &amp;lt;- OK PONG\n  198.053s &amp;lt;- OK VERSION 1.0.0\n  198.053s &amp;lt;- OK PONG\n  198.053s &amp;lt;- OK VERSION 1.0.0\n  198.053s &amp;lt;- OK PONG\n  198.053s &amp;lt;- OK VERSION 1.0.0\n  198.053s &amp;lt;- OK PONG\n  198.053s &amp;lt;- OK VERSION 1.0.0\n  198.054s &amp;lt;- OK PONG\n  198.055s &amp;lt;- OK VERSION 1.0.0\n  198.055s &amp;lt;- OK PONG\n  198.055s &amp;lt;- OK VERSION 1.0.0\n  198.055s &amp;lt;- OK PONG\n  198.129s &amp;lt;- OK VERSION 1.0.0\n  198.130s &amp;lt;- OK PONG\n  198.130s &amp;lt;- OK VERSION 1.0.0\n  198.130s &amp;lt;- OK PONG\n  198.130s &amp;lt;- OK VERSION 1.0.0\n  198.130s &amp;lt;- OK PONG\n  198.130s &amp;lt;- OK VERSION 1.0.0\n  198.130s &amp;lt;- OK PONG\n  198.131s &amp;lt;- OK VERSION 1.0.0\n  198.131s &amp;lt;- OK PONG\n  198.131s &amp;lt;- OK VERSION 1.0.0\n  198.131s &amp;lt;- OK PONG\n  198.131s &amp;lt;- OK VERSION 1.0.0\n  198.131s &amp;lt;- OK PONG\n  198.131s &amp;lt;- OK VERSION 1.0.0\n  198.131s &amp;lt;- OK PONG\n  198.132s &amp;lt;- OK VERSION 1.0.0\n  198.132s &amp;lt;- OK PONG\n  198.132s &amp;lt;- OK VERSION 1.0.0\n  198.132s &amp;lt;- OK PONG\n  198.132s &amp;lt;- OK VERSION 1.0.0\n  198.132s &amp;lt;- OK PONG\n  198.132s &amp;lt;- OK VERSION 1.0.0\n  198.132s &amp;lt;- OK PONG\n  198.133s &amp;lt;- OK VERSION 1.0.0&#34;}], &#34;tests/test_smoke.py::test_boot_banner_reports_firmware_version&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_smoke.py::test_boot_banner_reports_firmware_version&#34;, &#34;duration&#34;: &#34;00:00:04&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_smoke.py::test_boot_banner_reports_firmware_version&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:04&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  198.349s -&amp;gt; STREAM OFF\n  198.491s &amp;lt;- OK STREAM OFF\n  198.491s -&amp;gt; FAULT I2C OFF\n  198.703s &amp;lt;- OK FAULT I2C OFF\n  198.703s -&amp;gt; RATE 1000\n  198.924s &amp;lt;- OK RATE 1000\n  198.924s -&amp;gt; CLEAR\n  199.136s &amp;lt;- OK CLEAR\n  199.136s -&amp;gt; STATUS\n  199.368s &amp;lt;- OK STATUS uptime_ms=207298 samples=1 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  199.575s -&amp;gt; RESET\n  199.681s &amp;lt;- OK RESET\n  199.681s &amp;lt;- ets Jul 29 2019 12:21:46\n  199.681s &amp;lt;- \n  199.681s &amp;lt;- rst:0xc (SW_CPU_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)\n  199.681s &amp;lt;- configsip: 0, SPIWP:0xee\n  199.682s &amp;lt;- clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00\n  199.682s &amp;lt;- mode:DIO, clock div:2\n  199.682s &amp;lt;- load:0x3fff0030,len:1156\n  199.683s &amp;lt;- load:0x40078000,len:11456\n  199.683s &amp;lt;- ho 0 tail 12 room 4\n  199.683s &amp;lt;- load:0x40080400,len:2972\n  199.683s &amp;lt;- entry 0x400805dc\n  200.269s &amp;lt;- BOOT fw=1.0.0 reset=SOFTWARE\n  200.480s -&amp;gt; STREAM OFF\n  200.663s &amp;lt;- OK STREAM OFF\n  200.663s -&amp;gt; FAULT I2C OFF\n  200.919s &amp;lt;- OK FAULT I2C OFF\n  200.919s -&amp;gt; RATE 1000\n  201.196s &amp;lt;- OK RATE 1000\n  201.196s -&amp;gt; CLEAR\n  201.426s &amp;lt;- OK CLEAR\n  201.426s -&amp;gt; STATUS\n  201.656s &amp;lt;- OK STATUS uptime_ms=208532 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE&#34;}], &#34;tests/test_smoke.py::test_ping_answers_pong&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_smoke.py::test_ping_answers_pong&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_smoke.py::test_ping_answers_pong&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  202.074s -&amp;gt; STREAM OFF\n  202.254s &amp;lt;- OK STREAM OFF\n  202.254s -&amp;gt; FAULT I2C OFF\n  202.459s &amp;lt;- OK FAULT I2C OFF\n  202.459s -&amp;gt; RATE 1000\n  202.670s &amp;lt;- OK RATE 1000\n  202.670s -&amp;gt; CLEAR\n  202.872s &amp;lt;- OK CLEAR\n  202.872s -&amp;gt; STATUS\n  203.081s &amp;lt;- OK STATUS uptime_ms=209232 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  203.290s -&amp;gt; PING\n  203.461s &amp;lt;- OK PONG&#34;}], &#34;tests/test_smoke.py::test_version_matches_boot_banner&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_smoke.py::test_version_matches_boot_banner&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_smoke.py::test_version_matches_boot_banner&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  203.671s -&amp;gt; STREAM OFF\n  203.834s &amp;lt;- OK STREAM OFF\n  203.834s -&amp;gt; FAULT I2C OFF\n  204.050s &amp;lt;- OK FAULT I2C OFF\n  204.050s -&amp;gt; RATE 1000\n  204.258s &amp;lt;- OK RATE 1000\n  204.259s -&amp;gt; CLEAR\n  204.463s &amp;lt;- OK CLEAR\n  204.463s -&amp;gt; STATUS\n  204.667s &amp;lt;- OK STATUS uptime_ms=209965 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  204.874s -&amp;gt; VERSION\n  205.044s &amp;lt;- OK VERSION 1.0.0&#34;}], &#34;tests/test_smoke.py::test_status_has_every_key_in_order&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_smoke.py::test_status_has_every_key_in_order&#34;, &#34;duration&#34;: &#34;00:00:02&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_smoke.py::test_status_has_every_key_in_order&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:02&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  205.259s -&amp;gt; STREAM OFF\n  205.469s &amp;lt;- OK STREAM OFF\n  205.469s -&amp;gt; FAULT I2C OFF\n  205.682s &amp;lt;- OK FAULT I2C OFF\n  205.682s -&amp;gt; RATE 1000\n  205.905s &amp;lt;- OK RATE 1000\n  205.905s -&amp;gt; CLEAR\n  206.084s &amp;lt;- OK CLEAR\n  206.084s -&amp;gt; STATUS\n  206.246s &amp;lt;- OK STATUS uptime_ms=210665 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE\n  206.447s -&amp;gt; STATUS\n  206.642s &amp;lt;- OK STATUS uptime_ms=210832 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=SOFTWARE&#34;}]}, &#34;renderCollapsed&#34;: [&#34;passed&#34;], &#34;initialSort&#34;: &#34;result&#34;, &#34;title&#34;: &#34;Embedded HIL test report&#34;}"></div>
+    <script>
+      (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+const { getCollapsedCategory, setCollapsedIds } = require('./storage.js')
+
+class DataManager {
+    setManager(data) {
+        const collapsedCategories = [...getCollapsedCategory(data.renderCollapsed)]
+        const collapsedIds = []
+        const tests = Object.values(data.tests).flat().map((test, index) => {
+            const collapsed = collapsedCategories.includes(test.result.toLowerCase())
+            const id = `test_${index}`
+            if (collapsed) {
+                collapsedIds.push(id)
+            }
+            return {
+                ...test,
+                id,
+                collapsed,
+            }
+        })
+        const dataBlob = { ...data, tests }
+        this.data = { ...dataBlob }
+        this.renderData = { ...dataBlob }
+        setCollapsedIds(collapsedIds)
+    }
+
+    get allData() {
+        return { ...this.data }
+    }
+
+    resetRender() {
+        this.renderData = { ...this.data }
+    }
+
+    setRender(data) {
+        this.renderData.tests = [...data]
+    }
+
+    toggleCollapsedItem(id) {
+        this.renderData.tests = this.renderData.tests.map((test) =>
+            test.id === id ? { ...test, collapsed: !test.collapsed } : test,
+        )
+    }
+
+    set allCollapsed(collapsed) {
+        this.renderData = { ...this.renderData, tests: [...this.renderData.tests.map((test) => (
+            { ...test, collapsed }
+        ))] }
+    }
+
+    get testSubset() {
+        return [...this.renderData.tests]
+    }
+
+    get environment() {
+        return this.renderData.environment
+    }
+
+    get initialSort() {
+        return this.data.initialSort
+    }
+}
+
+module.exports = {
+    manager: new DataManager(),
+}
+
+},{"./storage.js":8}],2:[function(require,module,exports){
+const mediaViewer = require('./mediaviewer.js')
+const templateEnvRow = document.getElementById('template_environment_row')
+const templateResult = document.getElementById('template_results-table__tbody')
+
+function htmlToElements(html) {
+    const temp = document.createElement('template')
+    temp.innerHTML = html
+    return temp.content.childNodes
+}
+
+const find = (selector, elem) => {
+    if (!elem) {
+        elem = document
+    }
+    return elem.querySelector(selector)
+}
+
+const findAll = (selector, elem) => {
+    if (!elem) {
+        elem = document
+    }
+    return [...elem.querySelectorAll(selector)]
+}
+
+const dom = {
+    getStaticRow: (key, value) => {
+        const envRow = templateEnvRow.content.cloneNode(true)
+        const isObj = typeof value === 'object' && value !== null
+        const values = isObj ? Object.keys(value).map((k) => `${k}: ${value[k]}`) : null
+
+        const valuesElement = htmlToElements(
+            values ? `<ul>${values.map((val) => `<li>${val}</li>`).join('')}<ul>` : `<div>${value}</div>`)[0]
+        const td = findAll('td', envRow)
+        td[0].textContent = key
+        td[1].appendChild(valuesElement)
+
+        return envRow
+    },
+    getResultTBody: ({ testId, id, log, extras, resultsTableRow, tableHtml, result, collapsed }) => {
+        const resultBody = templateResult.content.cloneNode(true)
+        resultBody.querySelector('tbody').classList.add(result.toLowerCase())
+        resultBody.querySelector('tbody').id = testId
+        resultBody.querySelector('.collapsible').dataset.id = id
+
+        resultsTableRow.forEach((html) => {
+            const t = document.createElement('template')
+            t.innerHTML = html
+            resultBody.querySelector('.collapsible').appendChild(t.content)
+        })
+
+        if (log) {
+            // Wrap lines starting with "E" with span.error to color those lines red
+            const wrappedLog = log.replace(/^E.*$/gm, (match) => `<span class="error">${match}</span>`)
+            resultBody.querySelector('.log').innerHTML = wrappedLog
+        } else {
+            resultBody.querySelector('.log').remove()
+        }
+
+        if (collapsed) {
+            resultBody.querySelector('.collapsible > .col-result')?.classList.add('collapsed')
+            resultBody.querySelector('.extras-row').classList.add('hidden')
+        } else {
+            resultBody.querySelector('.collapsible > .col-result')?.classList.remove('collapsed')
+        }
+
+        const media = []
+        extras?.forEach(({ name, format_type, content }) => {
+            if (['image', 'video'].includes(format_type)) {
+                media.push({ path: content, name, format_type })
+            }
+
+            if (format_type === 'html') {
+                resultBody.querySelector('.extraHTML').insertAdjacentHTML('beforeend', `<div>${content}</div>`)
+            }
+        })
+        mediaViewer.setup(resultBody, media)
+
+        // Add custom html from the pytest_html_results_table_html hook
+        tableHtml?.forEach((item) => {
+            resultBody.querySelector('td[class="extra"]').insertAdjacentHTML('beforeend', item)
+        })
+
+        return resultBody
+    },
+}
+
+module.exports = {
+    dom,
+    htmlToElements,
+    find,
+    findAll,
+}
+
+},{"./mediaviewer.js":6}],3:[function(require,module,exports){
+const { manager } = require('./datamanager.js')
+const { doSort } = require('./sort.js')
+const storageModule = require('./storage.js')
+
+const getFilteredSubSet = (filter) =>
+    manager.allData.tests.filter(({ result }) => filter.includes(result.toLowerCase()))
+
+const doInitFilter = () => {
+    const currentFilter = storageModule.getVisible()
+    const filteredSubset = getFilteredSubSet(currentFilter)
+    manager.setRender(filteredSubset)
+}
+
+const doFilter = (type, show) => {
+    if (show) {
+        storageModule.showCategory(type)
+    } else {
+        storageModule.hideCategory(type)
+    }
+
+    const currentFilter = storageModule.getVisible()
+    const filteredSubset = getFilteredSubSet(currentFilter)
+    manager.setRender(filteredSubset)
+
+    const sortColumn = storageModule.getSort()
+    doSort(sortColumn, true)
+}
+
+module.exports = {
+    doFilter,
+    doInitFilter,
+}
+
+},{"./datamanager.js":1,"./sort.js":7,"./storage.js":8}],4:[function(require,module,exports){
+const { redraw, bindEvents, renderStatic } = require('./main.js')
+const { doInitFilter } = require('./filter.js')
+const { doInitSort } = require('./sort.js')
+const { manager } = require('./datamanager.js')
+const data = JSON.parse(document.getElementById('data-container').dataset.jsonblob)
+
+function init() {
+    manager.setManager(data)
+    doInitFilter()
+    doInitSort()
+    renderStatic()
+    redraw()
+    bindEvents()
+}
+
+init()
+
+},{"./datamanager.js":1,"./filter.js":3,"./main.js":5,"./sort.js":7}],5:[function(require,module,exports){
+const { dom, find, findAll } = require('./dom.js')
+const { manager } = require('./datamanager.js')
+const { doSort } = require('./sort.js')
+const { doFilter } = require('./filter.js')
+const {
+    getVisible,
+    getCollapsedIds,
+    setCollapsedIds,
+    getSort,
+    getSortDirection,
+    possibleFilters,
+} = require('./storage.js')
+
+const removeChildren = (node) => {
+    while (node.firstChild) {
+        node.removeChild(node.firstChild)
+    }
+}
+
+const renderStatic = () => {
+    const renderEnvironmentTable = () => {
+        const environment = manager.environment
+        const rows = Object.keys(environment).map((key) => dom.getStaticRow(key, environment[key]))
+        const table = document.getElementById('environment')
+        removeChildren(table)
+        rows.forEach((row) => table.appendChild(row))
+    }
+    renderEnvironmentTable()
+}
+
+const addItemToggleListener = (elem) => {
+    elem.addEventListener('click', ({ target }) => {
+        const id = target.parentElement.dataset.id
+        manager.toggleCollapsedItem(id)
+
+        const collapsedIds = getCollapsedIds()
+        if (collapsedIds.includes(id)) {
+            const updated = collapsedIds.filter((item) => item !== id)
+            setCollapsedIds(updated)
+        } else {
+            collapsedIds.push(id)
+            setCollapsedIds(collapsedIds)
+        }
+        redraw()
+    })
+}
+
+const renderContent = (tests) => {
+    const sortAttr = getSort(manager.initialSort)
+    const sortAsc = JSON.parse(getSortDirection())
+    const rows = tests.map(dom.getResultTBody)
+    const table = document.getElementById('results-table')
+    const tableHeader = document.getElementById('results-table-head')
+
+    const newTable = document.createElement('table')
+    newTable.id = 'results-table'
+
+    // remove all sorting classes and set the relevant
+    findAll('.sortable', tableHeader).forEach((elem) => elem.classList.remove('asc', 'desc'))
+    tableHeader.querySelector(`.sortable[data-column-type="${sortAttr}"]`)?.classList.add(sortAsc ? 'desc' : 'asc')
+    newTable.appendChild(tableHeader)
+
+    if (!rows.length) {
+        const emptyTable = document.getElementById('template_results-table__body--empty').content.cloneNode(true)
+        newTable.appendChild(emptyTable)
+    } else {
+        rows.forEach((row) => {
+            if (!!row) {
+                findAll('.collapsible td:not(.col-links', row).forEach(addItemToggleListener)
+                find('.logexpander', row).addEventListener('click',
+                    (evt) => evt.target.parentNode.classList.toggle('expanded'),
+                )
+                newTable.appendChild(row)
+            }
+        })
+    }
+
+    table.replaceWith(newTable)
+}
+
+const renderDerived = () => {
+    const currentFilter = getVisible()
+    possibleFilters.forEach((result) => {
+        const input = document.querySelector(`input[data-test-result="${result}"]`)
+        input.checked = currentFilter.includes(result)
+    })
+}
+
+const bindEvents = () => {
+    const filterColumn = (evt) => {
+        const { target: element } = evt
+        const { testResult } = element.dataset
+
+        doFilter(testResult, element.checked)
+        const collapsedIds = getCollapsedIds()
+        const updated = manager.renderData.tests.map((test) => {
+            return {
+                ...test,
+                collapsed: collapsedIds.includes(test.id),
+            }
+        })
+        manager.setRender(updated)
+        redraw()
+    }
+
+    const header = document.getElementById('environment-header')
+    header.addEventListener('click', () => {
+        const table = document.getElementById('environment')
+        table.classList.toggle('hidden')
+        header.classList.toggle('collapsed')
+    })
+
+    findAll('input[name="filter_checkbox"]').forEach((elem) => {
+        elem.addEventListener('click', filterColumn)
+    })
+
+    findAll('.sortable').forEach((elem) => {
+        elem.addEventListener('click', (evt) => {
+            const { target: element } = evt
+            const { columnType } = element.dataset
+            doSort(columnType)
+            redraw()
+        })
+    })
+
+    document.getElementById('show_all_details').addEventListener('click', () => {
+        manager.allCollapsed = false
+        setCollapsedIds([])
+        redraw()
+    })
+    document.getElementById('hide_all_details').addEventListener('click', () => {
+        manager.allCollapsed = true
+        const allIds = manager.renderData.tests.map((test) => test.id)
+        setCollapsedIds(allIds)
+        redraw()
+    })
+}
+
+const redraw = () => {
+    const { testSubset } = manager
+
+    renderContent(testSubset)
+    renderDerived()
+}
+
+module.exports = {
+    redraw,
+    bindEvents,
+    renderStatic,
+}
+
+},{"./datamanager.js":1,"./dom.js":2,"./filter.js":3,"./sort.js":7,"./storage.js":8}],6:[function(require,module,exports){
+class MediaViewer {
+    constructor(assets) {
+        this.assets = assets
+        this.index = 0
+    }
+
+    nextActive() {
+        this.index = this.index === this.assets.length - 1 ? 0 : this.index + 1
+        return [this.activeFile, this.index]
+    }
+
+    prevActive() {
+        this.index = this.index === 0 ? this.assets.length - 1 : this.index -1
+        return [this.activeFile, this.index]
+    }
+
+    get currentIndex() {
+        return this.index
+    }
+
+    get activeFile() {
+        return this.assets[this.index]
+    }
+}
+
+
+const setup = (resultBody, assets) => {
+    if (!assets.length) {
+        resultBody.querySelector('.media').classList.add('hidden')
+        return
+    }
+
+    const mediaViewer = new MediaViewer(assets)
+    const container = resultBody.querySelector('.media-container')
+    const leftArrow = resultBody.querySelector('.media-container__nav--left')
+    const rightArrow = resultBody.querySelector('.media-container__nav--right')
+    const mediaName = resultBody.querySelector('.media__name')
+    const counter = resultBody.querySelector('.media__counter')
+    const imageEl = resultBody.querySelector('img')
+    const sourceEl = resultBody.querySelector('source')
+    const videoEl = resultBody.querySelector('video')
+
+    const setImg = (media, index) => {
+        if (media?.format_type === 'image') {
+            imageEl.src = media.path
+
+            imageEl.classList.remove('hidden')
+            videoEl.classList.add('hidden')
+        } else if (media?.format_type === 'video') {
+            sourceEl.src = media.path
+
+            videoEl.classList.remove('hidden')
+            imageEl.classList.add('hidden')
+        }
+
+        mediaName.innerText = media?.name
+        counter.innerText = `${index + 1} / ${assets.length}`
+    }
+    setImg(mediaViewer.activeFile, mediaViewer.currentIndex)
+
+    const moveLeft = () => {
+        const [media, index] = mediaViewer.prevActive()
+        setImg(media, index)
+    }
+    const doRight = () => {
+        const [media, index] = mediaViewer.nextActive()
+        setImg(media, index)
+    }
+    const openImg = () => {
+        window.open(mediaViewer.activeFile.path, '_blank')
+    }
+    if (assets.length === 1) {
+        container.classList.add('media-container--fullscreen')
+    } else {
+        leftArrow.addEventListener('click', moveLeft)
+        rightArrow.addEventListener('click', doRight)
+    }
+    imageEl.addEventListener('click', openImg)
+}
+
+module.exports = {
+    setup,
+}
+
+},{}],7:[function(require,module,exports){
+const { manager } = require('./datamanager.js')
+const storageModule = require('./storage.js')
+
+const genericSort = (list, key, ascending, customOrder) => {
+    let sorted
+    if (customOrder) {
+        sorted = list.sort((a, b) => {
+            const aValue = a.result.toLowerCase()
+            const bValue = b.result.toLowerCase()
+
+            const aIndex = customOrder.findIndex((item) => item.toLowerCase() === aValue)
+            const bIndex = customOrder.findIndex((item) => item.toLowerCase() === bValue)
+
+            // Compare the indices to determine the sort order
+            return aIndex - bIndex
+        })
+    } else {
+        sorted = list.sort((a, b) => a[key] === b[key] ? 0 : a[key] > b[key] ? 1 : -1)
+    }
+
+    if (ascending) {
+        sorted.reverse()
+    }
+    return sorted
+}
+
+const durationSort = (list, ascending) => {
+    const parseDuration = (duration) => {
+        if (duration.includes(':')) {
+            // If it's in the format "HH:mm:ss"
+            const [hours, minutes, seconds] = duration.split(':').map(Number)
+            return (hours * 3600 + minutes * 60 + seconds) * 1000
+        } else {
+            // If it's in the format "nnn ms"
+            return parseInt(duration)
+        }
+    }
+    const sorted = list.sort((a, b) => parseDuration(a['duration']) - parseDuration(b['duration']))
+    if (ascending) {
+        sorted.reverse()
+    }
+    return sorted
+}
+
+const doInitSort = () => {
+    const type = storageModule.getSort(manager.initialSort)
+    const ascending = storageModule.getSortDirection()
+    const list = manager.testSubset
+    const initialOrder = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed', 'Skipped', 'Passed']
+
+    storageModule.setSort(type)
+    storageModule.setSortDirection(ascending)
+
+    if (type?.toLowerCase() === 'original') {
+        manager.setRender(list)
+    } else {
+        let sortedList
+        switch (type) {
+        case 'duration':
+            sortedList = durationSort(list, ascending)
+            break
+        case 'result':
+            sortedList = genericSort(list, type, ascending, initialOrder)
+            break
+        default:
+            sortedList = genericSort(list, type, ascending)
+            break
+        }
+        manager.setRender(sortedList)
+    }
+}
+
+const doSort = (type, skipDirection) => {
+    const newSortType = storageModule.getSort(manager.initialSort) !== type
+    const currentAsc = storageModule.getSortDirection()
+    let ascending
+    if (skipDirection) {
+        ascending = currentAsc
+    } else {
+        ascending = newSortType ? false : !currentAsc
+    }
+    storageModule.setSort(type)
+    storageModule.setSortDirection(ascending)
+
+    const list = manager.testSubset
+    const sortedList = type === 'duration' ? durationSort(list, ascending) : genericSort(list, type, ascending)
+    manager.setRender(sortedList)
+}
+
+module.exports = {
+    doInitSort,
+    doSort,
+}
+
+},{"./datamanager.js":1,"./storage.js":8}],8:[function(require,module,exports){
+const possibleFilters = [
+    'passed',
+    'skipped',
+    'failed',
+    'error',
+    'xfailed',
+    'xpassed',
+    'rerun',
+]
+
+const getVisible = () => {
+    const url = new URL(window.location.href)
+    const settings = new URLSearchParams(url.search).get('visible')
+    const lower = (item) => {
+        const lowerItem = item.toLowerCase()
+        if (possibleFilters.includes(lowerItem)) {
+            return lowerItem
+        }
+        return null
+    }
+    return settings === null ?
+        possibleFilters :
+        [...new Set(settings?.split(',').map(lower).filter((item) => item))]
+}
+
+const hideCategory = (categoryToHide) => {
+    const url = new URL(window.location.href)
+    const visibleParams = new URLSearchParams(url.search).get('visible')
+    const currentVisible = visibleParams ? visibleParams.split(',') : [...possibleFilters]
+    const settings = [...new Set(currentVisible)].filter((f) => f !== categoryToHide).join(',')
+
+    url.searchParams.set('visible', settings)
+    window.history.pushState({}, null, unescape(url.href))
+}
+
+const showCategory = (categoryToShow) => {
+    if (typeof window === 'undefined') {
+        return
+    }
+    const url = new URL(window.location.href)
+    const currentVisible = new URLSearchParams(url.search).get('visible')?.split(',').filter(Boolean) ||
+        [...possibleFilters]
+    const settings = [...new Set([categoryToShow, ...currentVisible])]
+    const noFilter = possibleFilters.length === settings.length || !settings.length
+
+    noFilter ? url.searchParams.delete('visible') : url.searchParams.set('visible', settings.join(','))
+    window.history.pushState({}, null, unescape(url.href))
+}
+
+const getSort = (initialSort) => {
+    const url = new URL(window.location.href)
+    let sort = new URLSearchParams(url.search).get('sort')
+    if (!sort) {
+        sort = initialSort || 'result'
+    }
+    return sort
+}
+
+const setSort = (type) => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('sort', type)
+    window.history.pushState({}, null, unescape(url.href))
+}
+
+const getCollapsedCategory = (renderCollapsed) => {
+    let categories
+    if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href)
+        const collapsedItems = new URLSearchParams(url.search).get('collapsed')
+        switch (true) {
+        case !renderCollapsed && collapsedItems === null:
+            categories = ['passed']
+            break
+        case collapsedItems?.length === 0 || /^["']{2}$/.test(collapsedItems):
+            categories = []
+            break
+        case /^all$/.test(collapsedItems) || collapsedItems === null && /^all$/.test(renderCollapsed):
+            categories = [...possibleFilters]
+            break
+        default:
+            categories = collapsedItems?.split(',').map((item) => item.toLowerCase()) || renderCollapsed
+            break
+        }
+    } else {
+        categories = []
+    }
+    return categories
+}
+
+const getSortDirection = () => JSON.parse(sessionStorage.getItem('sortAsc')) || false
+const setSortDirection = (ascending) => sessionStorage.setItem('sortAsc', ascending)
+
+const getCollapsedIds = () => JSON.parse(sessionStorage.getItem('collapsedIds')) || []
+const setCollapsedIds = (list) => sessionStorage.setItem('collapsedIds', JSON.stringify(list))
+
+module.exports = {
+    getVisible,
+    hideCategory,
+    showCategory,
+    getCollapsedIds,
+    setCollapsedIds,
+    getSort,
+    setSort,
+    getSortDirection,
+    setSortDirection,
+    getCollapsedCategory,
+    possibleFilters,
+}
+
+},{}]},{},[4]);
+    </script>
+  </footer>
+  </body>
+</html>
