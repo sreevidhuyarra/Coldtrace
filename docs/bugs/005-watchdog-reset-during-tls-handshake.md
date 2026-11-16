@@ -2,7 +2,7 @@
 
 Found: 2026-11-16, ColdTrace Block 4 (first runs of the `esp32_cloud` build in Wokwi)
 Reopened: 2026-11-17 (end-to-end suite: two watchdog resets right after `RESET`)
-Status: fixed 2026-11-17, both causes; verification below
+Status: fixed 2026-11-17, both causes (cause A corrected after a third occurrence); verification below
 Severity: high · Priority: high (the device reboots instead of connecting; with a backlog it loses
 its queued readings, and `RESET` reports the wrong reset reason)
 
@@ -31,6 +31,26 @@ the same CPU as `loop()`. With the MQTT task at or above the loop's priority, th
 actually runs at (default 5), and below Wi-Fi and TCP/IP (18-23). The loop sleeps 1 ms per pass, so the
 handshake still gets almost all of the CPU.
 
+### Correction: priorities were not the fix
+
+During hands-on testing after the "fix" above, the watchdog fired again 10 s after `FAULT NET OFF`
+(reconnect), and once more 6 s into the next boot; the 24 readings queued during the outage were lost
+in those reboots. The report named `loopTask (CPU 1)` starved with `CPU 1: mqtt_task` running, and the
+breadcrumb was `WDT_STAGE 6`: the loop, at **priority 10**, was asleep in its 1 ms `delay()` while the
+**priority 1** MQTT task kept CPU 1. Priority scheduling cannot do that unless CPU 1 is not taking
+interrupts at all, so the stall is inside the TLS/crypto work of ESP-IDF's precompiled libraries, which
+this project cannot change. The earlier clean runs were luck; the priority change does no harm but is
+not what prevents the reset.
+
+The loop-gap monitor then measured it: with a 10 s watchdog, the next end-to-end run recorded
+**`EVT GAP 3348 stage=6`**, a 3.3 s freeze during the reconnect handshake right after `FAULT NET OFF`,
+0.7 s before `EVT NET_UP`. That freeze alone exceeds the old 3 s watchdog.
+
+**Actual fix for cause A:** the cloud build's task watchdog is **10 s** (the offline builds keep 3 s).
+A watchdog must outlast the longest legitimate pause, and in Wokwi a TLS handshake pauses the CPU for
+over 3 s. On a real ESP32 the same work takes milliseconds. The guard in every cloud test fails on any
+watchdog reboot and on any loop stall of 5 s (half the watchdog) or more, and records every stall.
+
 ## Cause B: the interrupt watchdog survived `RESET`
 After the priority fix, the end-to-end suite still saw `reset=WATCHDOG` twice, both right after the
 harness sent `RESET`, and with no loop gap at all. The serial log showed the sequence exactly:
@@ -50,9 +70,8 @@ same family of behaviour as [bug 002](002-uptime-not-reset-after-software-reset.
 MQTT running, `esp_restart()` also has much more to shut down.
 
 ## Fix
-- **A:** `loop()` at priority 10 (`vTaskPrioritySet` in `setup()`), MQTT task asked for priority 1,
-  1 ms sleep per pass, core 0's idle task not watched, `WiFi.persistent(false)` (no flash writes when
-  joining).
+- **A:** task watchdog 10 s in the cloud build (the fix); also kept: `loop()` at priority 10, MQTT task
+  at 1, 1 ms sleep per pass, core 0's idle task not watched, `WiFi.persistent(false)`.
 - **B:** `RESET` goes through `cloud_prepare_restart()`: take the loop off the task watchdog, stop the
   MQTT client, turn Wi-Fi off, then clear the **flash-boot protection bit** and disable the watchdog on
   both timer groups, then `esp_restart()`. The first attempt only disabled the interrupt watchdog, which
@@ -73,13 +92,17 @@ MQTT running, `esp_restart()` also has much more to shut down.
   during the test (`cloud_ready` fixture).
 - `HIL-CT-07` reboots the device three times; each must come back `reset=SOFTWARE`, reconnect and
   deliver a reading.
-- Final end-to-end run (2026-11-17, firmware `db51abff`): **7 / 7 pass** in 13 minutes. `HIL-CT-07`: three
+- After the correction (firmware `90b4bb3f`): end-to-end suite **7 / 7**, then four more outage and
+  reconnect cycles (3, 2, 3, 2 minutes), all readings delivered, no watchdog reset; one loop stall
+  recorded, 3,348 ms, during a reconnect handshake.
+- Earlier end-to-end run (2026-11-17, firmware `db51abff`): **7 / 7 pass** in 13 minutes. `HIL-CT-07`: three
   `RESET`s, each back as `SOFTWARE` and delivering a reading ~59 s later; `FAULT HANG` → `WATCHDOG`; no
   `EVT RESET_CHAIN`; no loop gap of 500 ms or more anywhere in the run.
 - Details in [the test plan](../test-plan.md) and `reports/wokwi-cloud-report.html`.
 
 ## Lessons
-1. A watchdog that guards a control loop defines a scheduling contract: every task that can hold the
-   CPU for seconds must run below the watched task.
+1. Measure before concluding. The priority theory fitted the first evidence and was wrong; the loop-gap
+   monitor, by timing the stalls the watchdog only reports as "too long", is what settled it. A
+   watchdog's timeout must exceed the longest legitimate pause on the platform it runs on.
 2. One symptom can have two causes. The breadcrumb showed different stages (6 and 5) for the two; reading
    which stage, not just "it crashed", is what separated them.

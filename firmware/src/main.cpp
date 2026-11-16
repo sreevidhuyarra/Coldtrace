@@ -31,7 +31,15 @@ static const int      PIN_SDA     = 21;
 static const int      PIN_SCL     = 22;
 static const uint32_t I2C_HZ      = 100000;   /* standard mode */
 static const uint32_t UART_BAUD   = 115200;
+#ifdef COLDTRACE_CLOUD
+/* The cloud build's watchdog must outlast the longest legitimate pause. In
+ * Wokwi the TLS handshake (ESP-IDF's precompiled crypto, in the MQTT task)
+ * can stall CPU 1 with interrupts blocked for over 3 s, so even a priority-10
+ * loop cannot run (docs/bugs/005). The offline builds keep 3 s. */
+static const uint32_t WDT_TIMEOUT_S = 10;
+#else
 static const uint32_t WDT_TIMEOUT_S = 3;
+#endif
 #ifdef COLDTRACE_CLOUD
 #include <esp_timer.h>
 static const UBaseType_t LOOP_TASK_PRIORITY = 10;  /* above esp-mqtt (1, default 5), below Wi-Fi/TCP-IP */

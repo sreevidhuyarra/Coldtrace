@@ -74,7 +74,7 @@ Present in every build. The network side is only active in the cloud firmware, w
 | Command | Success response | Error responses | Notes |
 | --- | --- | --- | --- |
 | `NET` | `OK NET link=UP\|DOWN\|NONE queued=<n> acked=<n> resends=<n> dropped=<n> next_seq=<n> report_ms=<n> boot=<hex8>` | `ERR ARGS` | Fields always in this order |
-| `REPORT <ms>` | `OK REPORT 30000` | `ERR ARGS`, `ERR RANGE` | One sample per interval goes to the cloud. Valid 1000–3600000; default 30000 |
+| `REPORT <ms>` | `OK REPORT 30000` | `ERR ARGS`, `ERR RANGE` | One sample per interval goes to the cloud. Valid 1000–3600000; default 30000. A local override: the twin's `report_ms` is applied again on every (re)connect |
 | `SEND` | `OK SEND seq=<n>` | `ERR NONET`, `ERR SENSOR`, `ERR ARGS` | Read now and queue the reading for the cloud |
 
 - Each cloud reading gets `seq` 1, 2, 3 … per boot, and each boot a random 32-bit `boot` id; the cloud's key
@@ -107,7 +107,7 @@ receives duplicates.
 | Sample spacing | `rate_ms` (±1 loop pass) |
 | Sensor marked LOST | On the 3rd failed read in a row; 1 or 2 failures are tolerated |
 | Retry while LOST | Every 5000 ms; commands keep working meanwhile |
-| Watchdog | Loop stalled for 3 s → reset, reported as `reset=WATCHDOG` |
+| Watchdog | Loop stalled for 3 s → reset, reported as `reset=WATCHDOG` (10 s in the `esp32_cloud` build, see [bug 005](bugs/005-watchdog-reset-during-tls-handshake.md)) |
 
 ## Example session
 

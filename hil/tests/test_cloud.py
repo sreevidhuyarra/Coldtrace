@@ -235,7 +235,7 @@ def test_reboots_reconnect_without_watchdog_resets(cloud_ready, cloud, cloud_res
     # A real hang must still read as a watchdog reset: the restart flag must not mask it.
     dev.clear_events()
     dev.expect_ok("FAULT HANG")
-    hang_boot = dev.wait_for_boot(30)
+    hang_boot = dev.wait_for_boot(40)              # 10 s watchdog in the cloud build
     cloud_results["reboots"] = {"reboot_to_stored_s": timings, "reset_chain_events": chains,
                                 "hang_reset_reason": hang_boot.reset}
     assert hang_boot.reset == "WATCHDOG", hang_boot

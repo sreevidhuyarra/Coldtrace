@@ -238,15 +238,16 @@ def cloud_ready(device: DeviceClient, cloud) -> DeviceClient:
     if any(cloud.twin_reported().get(k) != v for k, v in CLOUD_DEFAULTS.items()):
         cloud.twin_update(CLOUD_DEFAULTS)
 
-    # Bug 005 guard: no watchdog reboot and no loop stall near the watchdog
-    # during the test. EVT GAP is printed from 500 ms; 1500 ms (half the
-    # watchdog) or more fails the test.
+    # Bug 005 guard: no unexpected watchdog reboot and no loop stall near the
+    # watchdog during the test. EVT GAP is printed from 500 ms; 5000 ms (half
+    # the cloud build's 10 s watchdog) or more fails the test. Every gap is
+    # recorded in reports/cloud-latency.json.
     seen = [text for _, d, text in device.log[mark:] if d == "<-"]
     hangs = sum(1 for _, d, text in device.log[mark:] if d == "->" and text == "FAULT HANG")
     gaps = [int(t.split()[2]) for t in seen if t.startswith("EVT GAP ")]
     cloud_results_gaps.extend(gaps)
     wdt = [t for t in seen if t.startswith("BOOT ") and "reset=WATCHDOG" in t]
-    if len(wdt) > hangs or any(g >= 1500 for g in gaps):
+    if len(wdt) > hangs or any(g >= 5000 for g in gaps):
         pytest.fail(f"bug 005 guard: unexpected watchdog reboots {wdt} ({hangs} intended), "
                     f"loop gaps (ms) {gaps}")
 

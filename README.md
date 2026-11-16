@@ -175,23 +175,24 @@ each of those behaviours against the real Azure services. Firmware 2.0.0, tag `v
 
 | Test | What it proves | Result |
 | --- | --- | --- |
-| HIL-CT-01 Ingestion latency | Readings reach storage fast (cloud clocks: IoT Hub enqueue → stored) | p50 **38 ms**, p95 **45 ms**; PC `SEND` → row visible p50 1.05 s (includes Wokwi and polling) |
-| HIL-CT-02 Network outage | Wi-Fi down 2 minutes: every reading arrives exactly once | 21 readings queued, **all 21 stored, no gaps, 0 dropped**; link back and backlog delivered in ~16 s |
+| HIL-CT-01 Ingestion latency | Readings reach storage fast (cloud clocks: IoT Hub enqueue → stored) | p50 **34 ms**, p95 **41 ms**; PC `SEND` → row visible p50 1.1 s (includes Wokwi and polling) |
+| HIL-CT-02 Network outage | Wi-Fi down 2 minutes: every reading arrives exactly once | 24 readings queued, **all 24 stored, no gaps, 0 dropped**; link back and backlog delivered in ~17 s |
 | HIL-CT-03 Duplicates | A reading sent 3 times is stored once and counted | 3 copies received, **1 row** |
-| HIL-CT-04 Twin round trip | A cloud setting is applied and confirmed | device applied in ~7 s, confirmed in the cloud in ~11 s (PC clock, includes `az` CLI start-up) |
+| HIL-CT-04 Twin round trip | A cloud setting is applied and confirmed | device applied in ~8 s, confirmed in the cloud in ~13 s (PC clock, includes `az` CLI start-up) |
 | HIL-CT-05 Excursion alert | Above the limit past the window: exactly one alert, then clears | 1 alert at 12 °C against 8 °C / 10 s; cleared at 4 °C |
 | HIL-CT-06 Security | Bad credentials are refused | valid token accepted; tampered signature, wrong key, and a token expired 15 min ago refused |
-| HIL-CT-07 Reboots | `RESET` three times: back as `SOFTWARE`, reconnected, delivering; a real hang still reads `WATCHDOG` | 3 / 3 `SOFTWARE`, reboot to stored reading 11-22 s; hang → `WATCHDOG` ([bug 005](docs/bugs/005-watchdog-reset-during-tls-handshake.md)) |
+| HIL-CT-07 Reboots | `RESET` three times: back as `SOFTWARE`, reconnected, delivering; a real hang still reads `WATCHDOG` | 3 / 3 `SOFTWARE`, reboot to stored reading 11-15 s; hang → `WATCHDOG` ([bug 005](docs/bugs/005-watchdog-reset-during-tls-handshake.md)) |
 
 Every cloud test also fails if the device reboots by watchdog or its loop stalls for 1.5 s or more while
-the test runs; in the final run no loop stall reached even 500 ms. Numbers are in `reports/cloud-latency.json`.
+the test runs (half the cloud build's 10 s watchdog); the final run recorded one stall, 3.3 s, during a
+reconnect handshake. Four further outage-and-reconnect cycles also passed. Numbers are in `reports/cloud-latency.json`.
 
 ### Bugs found
 
-- [Bug 005](docs/bugs/005-watchdog-reset-during-tls-handshake.md), two causes behind one symptom: the TLS
-  handshake starved the watched loop task (fixed with task priorities, proven with an RTC-memory
-  breadcrumb and a loop-gap monitor), and in Wokwi the timer-group watchdog's flash-boot mode survived a
-  software reset and killed the next boot (fixed by clearing it before restart).
+- [Bug 005](docs/bugs/005-watchdog-reset-during-tls-handshake.md), two causes behind one symptom: in Wokwi
+  the TLS handshake freezes the CPU for over 3 s (measured 3.3 s with a loop-gap monitor after a
+  priority-based fix proved wrong; the cloud build's watchdog is now 10 s), and the timer-group
+  watchdog's flash-boot mode survived a software reset and killed the next boot (cleared before restart).
 - [Bug 006](docs/bugs/006-orphaned-alert-from-concurrent-function-instances.md): two Function instances
   processing the same backlog orphaned an alert (lost update); fixed with ETag concurrency.
 - Azure findings in the [spike notes](docs/spike-notes.md): newer hubs give devices a separate host name
