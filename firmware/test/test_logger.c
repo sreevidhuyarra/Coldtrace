@@ -51,7 +51,7 @@ static void tick_at(uint32_t t)
 static void test_boot_line_reports_version_and_reset_reason(void)
 {
     boot(0, RESET_WATCHDOG);
-    TEST_ASSERT_EQUAL_STRING("BOOT fw=1.0.0 reset=WATCHDOG\r\n", st.uart);
+    TEST_ASSERT_EQUAL_STRING("BOOT fw=2.0.0 reset=WATCHDOG\r\n", st.uart);
     TEST_ASSERT_EQUAL(SENSOR_OK, lg.sensor);
 }
 
@@ -60,7 +60,7 @@ static void test_boot_without_sensor_reports_lost_and_keeps_running(void)
     hal = fake_hal_init(&st);
     st.fail_always = true;
     logger_init(&lg, &hal, RESET_POWERON);
-    TEST_ASSERT_EQUAL_STRING("BOOT fw=1.0.0 reset=POWERON\r\nEVT SENSOR_LOST\r\n", st.uart);
+    TEST_ASSERT_EQUAL_STRING("BOOT fw=2.0.0 reset=POWERON\r\nEVT SENSOR_LOST\r\n", st.uart);
     TEST_ASSERT_EQUAL_STRING("OK PONG\r\n", send("PING"));
 }
 
@@ -69,7 +69,7 @@ static void test_boot_without_sensor_reports_lost_and_keeps_running(void)
 static void test_ping_and_version(void)
 {
     TEST_ASSERT_EQUAL_STRING("OK PONG\r\n", send("PING"));
-    TEST_ASSERT_EQUAL_STRING("OK VERSION 1.0.0\r\n", send("VERSION"));
+    TEST_ASSERT_EQUAL_STRING("OK VERSION 2.0.0\r\n", send("VERSION"));
 }
 
 static void test_unknown_and_lowercase_commands_are_unknown(void)

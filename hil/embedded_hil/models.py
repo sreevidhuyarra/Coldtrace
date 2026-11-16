@@ -36,7 +36,7 @@ class Event:
 
     `EVT SENSOR_LOST`      -> name="SENSOR_LOST", args=[]
     `EVT S 2000 24.01`     -> name="S",           args=["2000", "24.01"]
-    `BOOT fw=1.0.0 reset=` -> name="BOOT",        args=["fw=1.0.0", "reset=..."]
+    `BOOT fw=2.0.0 reset=` -> name="BOOT",        args=["fw=2.0.0", "reset=..."]
     """
 
     name: str
@@ -66,7 +66,7 @@ class Sample:
 
 @dataclass(frozen=True)
 class BootInfo:
-    """Parsed `BOOT fw=1.0.0 reset=POWERON`."""
+    """Parsed `BOOT fw=2.0.0 reset=POWERON`."""
 
     fw: str
     reset: str

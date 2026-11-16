@@ -1,8 +1,9 @@
-# Test plan — ESP32 temperature logger firmware v1.1.0
+# Test plan — ESP32 temperature logger firmware v2.0.0
 
 Every requirement in [protocol.md](protocol.md) is tested automatically by the hardware-in-the-loop (HIL)
 harness, on the host simulator in CI and on the real firmware in Wokwi. Final run: **38/38 pass on the
-simulator; 36 pass, 1 not applicable, 1 known Wokwi limitation on Wokwi.**
+simulator; 36 pass, 1 not applicable, 1 known Wokwi limitation on Wokwi.** The ColdTrace cloud
+requirements (v2.0.0) are in [section 8](#8-coldtrace-cloud-v200).
 
 ## 1. Scope
 
@@ -50,7 +51,7 @@ UCRT64 on Windows, Ubuntu in CI); PlatformIO with espressif32 6.9.0.
 ## 4. Entry and exit criteria
 
 **Entry:** `make test` passes; `make sim` and both PlatformIO builds compile with zero warnings; the firmware
-boots and prints `BOOT fw=1.0.0`.
+boots and prints `BOOT fw=2.0.0`.
 
 **Exit (release):**
 
@@ -70,7 +71,7 @@ Test IDs appear in each test's docstring (`hil/tests/`). Unit tests are in `firm
 | --- | --- | --- | --- | --- | --- |
 | R-01 | `BOOT fw=… reset=…` once after every start | HIL-SM-01, RS-01, RS-02 | `test_boot_*` | Pass | Pass |
 | R-02 | `PING` → `OK PONG` | HIL-SM-02 | `test_ping_and_version` | Pass | Pass |
-| R-03 | `VERSION` → `OK VERSION 1.0.0` | HIL-SM-03 | `test_ping_and_version` | Pass | Pass |
+| R-03 | `VERSION` → `OK VERSION 2.0.0` | HIL-SM-03 | `test_ping_and_version` | Pass | Pass |
 | R-04 | `STATUS` has all 7 fields in fixed order | HIL-SM-04 | `test_status_reports_every_field_in_fixed_order` | Pass | Pass |
 | R-05 | `READ` within ±0.1 °C of the sensor | HIL-FN-01 | `test_conversion_*` | Pass | Pass |
 | R-06 | `READ` → `ERR SENSOR` when the sensor fails | HIL-FT-01 | `test_three_failures_mark_lost_once_*` | Pass | Pass |
@@ -115,6 +116,8 @@ FT-03; firmware hang → RS-02; malformed input → RB-02, RB-03, RB-04; command
 | [002](bugs/002-uptime-not-reset-after-software-reset.md) | `uptime_ms` not restarted after `RESET` in Wokwi | Manual Wokwi run | Low | Wokwi limitation, xfail |
 | [003](bugs/003-commands-answered-after-reset-or-hang.md) | Commands queued behind `RESET`/`FAULT HANG` still answered | Simulator bring-up | Medium | Fixed |
 | [004](bugs/004-uart-rx-overflow-drops-bytes-in-bursts.md) | UART receive buffer overflow on bursts over ~1.5 KB | HIL-RB-04 on Wokwi | Medium | Fixed |
+| [005](bugs/005-watchdog-reset-during-tls-handshake.md) | Cloud firmware: watchdog resets around connecting (TLS starvation; interrupt watchdog surviving `RESET`) | Wokwi runs, HIL-CT-07, RTC breadcrumbs | High | Fixed |
+| [006](bugs/006-orphaned-alert-from-concurrent-function-instances.md) | Two Function instances race on a device's state; an alert is orphaned | Dashboard | Medium | Fixed |
 
 ## 7. Reports
 
@@ -122,3 +125,35 @@ FT-03; firmware hang → RS-02; malformed input → RB-02, RB-03, RB-04; command
   firmware version and commit in the header, and each test's serial conversation.
 - `reports/latency-sim.json`, `reports/latency-wokwi.json`: `PING` round-trip p50 / p95 / max.
 - CI uploads the simulator report as the `hil-sim-report` artifact on every push.
+- `reports/wokwi-cloud-report.html`, `reports/cloud-latency.json`: the ColdTrace end-to-end run and its
+  measured numbers.
+
+## 8. ColdTrace cloud (v2.0.0)
+
+Scope: the `esp32_cloud` firmware in Wokwi, Azure IoT Hub (F1), the Azure Function and Table Storage, driven
+from the PC by `pytest --target wokwi --cloud -m cloud` (`hil/tests/test_cloud.py`, `hil/embedded_hil/cloud.py`).
+Credentials come from the tester's `az login`; nothing secret is in the repository.
+
+Levels: 46 Unity tests for store and forward and the twin reader (`test_publisher`, `test_logger_net`,
+`test_twin`), 35 pytest tests for the cloud logic with an in-memory store (`azure/tests`), and the seven
+end-to-end tests below. Final run 2026-11-17: **7 / 7 pass** in 13 min.
+
+Rules: latency is measured with cloud clocks (IoT Hub enqueue → stored) or the PC's clock at both ends,
+never the device's (Wokwi's clock drifts). Every cloud test starts from link up, no faults, temperature held
+at 4 °C with `FAULT TEMP`, and the twin at its defaults (30 s, 8 °C, 300 s). Every cloud test fails if the
+device reboots by watchdog or reports a loop stall of 1.5 s or more (bug 005 guard).
+
+| Req | Requirement | Test | Unit tests | Result |
+| --- | --- | --- | --- | --- |
+| C-01 | Readings reach storage quickly | HIL-CT-01 | — | Pass: ingest p50 37 ms, p95 46 ms |
+| C-02 | A 2-minute outage loses nothing; every seq stored once | HIL-CT-02 | `test_two_minute_outage_backlog_*`, `test_fault_net_*` | Pass: 24 / 24, no gaps |
+| C-03 | Readings sent more than once are stored once and counted | HIL-CT-03 | `test_each_reading_is_stored_once_*`, `test_fault_noack_*` | Pass: 3 copies, 1 row |
+| C-04 | Twin settings are validated, applied and reported back | HIL-CT-04 | `test_twin_*` (logger, parser) | Pass: ~8 s device, ~14 s cloud |
+| C-05 | Above the limit past the window: exactly one alert, then clears | HIL-CT-05 | `test_excursion_*`, `test_two_instances_racing_*` | Pass |
+| C-06 | Tampered, wrong-key and expired credentials are refused | HIL-CT-06 | — | Pass |
+| C-07 | `RESET` comes back `SOFTWARE` and reconnects; a hang still reads `WATCHDOG` | HIL-CT-07 | — | Pass: 3 / 3 `SOFTWARE`, hang → `WATCHDOG` |
+| C-08 | Overflow drops the oldest reading and leaves a visible seq gap | — | `test_overflow_drops_oldest_*` | Pass (unit) |
+| C-09 | A device cannot write readings as another device | — | `test_parse_rejects_a_device_claiming_*` | Pass (unit) |
+
+Observations recorded rather than asserted: a SAS token that expired 60 s earlier was still accepted
+(IoT Hub allows some clock-skew grace); the twin round trip includes 2-4 s of `az` CLI start-up per call.

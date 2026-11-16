@@ -216,7 +216,7 @@ static void test_fault_net_and_noack_reject_bad_args(void)
 static void test_existing_commands_are_unchanged_by_cloud_reporting(void)
 {
     TEST_ASSERT_EQUAL_STRING("OK PONG\r\n", send("PING"));
-    TEST_ASSERT_EQUAL_STRING("OK VERSION 1.0.0\r\n", send("VERSION"));
+    TEST_ASSERT_EQUAL_STRING("OK VERSION 2.0.0\r\n", send("VERSION"));
     run_until(3000);
     TEST_ASSERT_EQUAL_STRING("OK DUMP 1\r\nS 3000 24.01\r\nEND\r\n", send("DUMP 1"));
 }

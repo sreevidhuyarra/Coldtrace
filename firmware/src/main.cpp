@@ -32,6 +32,11 @@ static const int      PIN_SCL     = 22;
 static const uint32_t I2C_HZ      = 100000;   /* standard mode */
 static const uint32_t UART_BAUD   = 115200;
 static const uint32_t WDT_TIMEOUT_S = 3;
+#ifdef COLDTRACE_CLOUD
+#include <esp_timer.h>
+static const UBaseType_t LOOP_TASK_PRIORITY = 10;  /* above esp-mqtt (1, default 5), below Wi-Fi/TCP-IP */
+static const uint32_t    LOOP_GAP_REPORT_MS = 500;
+#endif
 
 /* ---- HAL implementation ------------------------------------------------ */
 
@@ -138,25 +143,49 @@ void setup()
     Wire.setTimeOut(50);                      /* a dead bus must not stall the loop */
 
     reset_reason_t reason = map_reset_reason(esp_reset_reason());
+#ifdef COLDTRACE_CLOUD
+    bool reset_chained = false;
+    reason = cloud_check_requested_restart(reason, &reset_chained);
+#endif
     watchdog_start();
     logger_init(&g_logger, &g_hal, reason);
 #ifdef COLDTRACE_CLOUD
-    /* The control loop outranks the MQTT task (priority 1): when its 1 ms
-     * sleep ends it preempts the TLS work at once. At equal priority the
-     * ESP32's SMP scheduler did not reliably share the core, and a reconnect
-     * handshake starved loop() inside delay(1) for over 3 s (EVT WDT_STAGE 6,
-     * docs/bugs/005). */
-    vTaskPrioritySet(NULL, 2);
-    cloud_begin(&g_logger);
+    /* The control loop outranks every task that can do seconds of CPU work:
+     * the MQTT/TLS task (asked for 1; esp-mqtt's default is 5) and anything
+     * else at the default priorities. Wi-Fi and TCP/IP (18-23) stay above it.
+     * Equal or lower priority let a TLS handshake starve loop() past the 3 s
+     * watchdog (docs/bugs/005). The loop sleeps 1 ms per pass, so it gives
+     * the CPU back almost all the time. */
+    vTaskPrioritySet(NULL, LOOP_TASK_PRIORITY);
+    cloud_begin(&g_logger, reset_chained);
 #endif
 }
 
-#ifndef COLDTRACE_CLOUD
+#ifdef COLDTRACE_CLOUD
+/* Loop-gap monitor (bug 005): the time between loop passes, measured on the
+ * hardware timer so a stalled scheduler cannot hide it. Normally ~1-2 ms; any
+ * gap of 500 ms or more is printed with the stage the loop was stalled in,
+ * long before the 3 s watchdog would fire. */
+static void watch_loop_gap(void)
+{
+    static int64_t s_last_us;
+    int64_t now = esp_timer_get_time();
+    if (s_last_us != 0) {
+        uint32_t gap_ms = (uint32_t)((now - s_last_us) / 1000);
+        if (gap_ms >= LOOP_GAP_REPORT_MS) {
+            Serial.printf("EVT GAP %lu stage=%lu\r\n", (unsigned long)gap_ms, (unsigned long)g_cloud_stage);
+        }
+    }
+    s_last_us = now;
+}
+#else
 #define CLOUD_STAGE(n) ((void)0)              /* crash breadcrumbs: cloud build only */
+static void watch_loop_gap(void) {}
 #endif
 
 void loop()
 {
+    watch_loop_gap();                         /* before the stage changes: reports where it stalled */
     CLOUD_STAGE(STAGE_FEED);
     esp_task_wdt_reset();                     /* 1. feed the watchdog */
 
@@ -176,6 +205,9 @@ void loop()
     switch (logger_take_action(&g_logger)) {  /* 5. pending actions */
     case ACT_RESET:
         Serial.flush();                       /* let "OK RESET" go out first */
+#ifdef COLDTRACE_CLOUD
+        cloud_prepare_restart();              /* network down, watchdogs disarmed (bug 005) */
+#endif
         esp_restart();
         break;
     case ACT_HANG:

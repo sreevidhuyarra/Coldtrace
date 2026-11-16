@@ -7,10 +7,10 @@ STATUS_KEYS = ["uptime_ms", "samples", "rate_ms", "sensor", "errors", "overflows
 
 
 def test_boot_banner_reports_firmware_version(fresh_device):
-    """HIL-SM-01: after a start the device prints BOOT with fw=1.0.0 and a valid reset reason."""
+    """HIL-SM-01: after a start the device prints BOOT with fw=2.0.0 and a valid reset reason."""
     boot = fresh_device.boot
     assert boot is not None
-    assert boot.fw == "1.0.0"
+    assert boot.fw == "2.0.0"
     assert boot.reset in {"POWERON", "SOFTWARE"}
 
 
@@ -22,7 +22,7 @@ def test_ping_answers_pong(device):
 def test_version_matches_boot_banner(device):
     """HIL-SM-03: VERSION reports the same version as the BOOT line."""
     resp = device.expect_ok("VERSION")
-    assert resp.raw == "OK VERSION 1.0.0"
+    assert resp.raw == "OK VERSION 2.0.0"
     assert resp.args[0] == device.boot.fw
 
 

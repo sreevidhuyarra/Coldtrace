@@ -17,7 +17,7 @@ from typing import Optional
 
 import pytest
 
-from embedded_hil import DeviceClient, DeviceTimeout, ProcessTransport, SerialTransport
+from embedded_hil import BootInfo, DeviceClient, DeviceTimeout, ProcessTransport, SerialTransport
 
 REPO = Path(__file__).resolve().parents[2]
 EXE = ".exe" if os.name == "nt" else ""
@@ -56,18 +56,26 @@ def pytest_addoption(parser: pytest.Parser) -> None:
                 help="host simulator binary (default: build/sim)")
     g.addoption("--timeout-scale", type=float, default=None,
                 help="multiply every timeout (default: sim 1, wokwi 4, serial 1.5)")
+    c = parser.getgroup("cloud", "ColdTrace end-to-end tests (esp32_cloud firmware + Azure)")
+    c.addoption("--cloud", action="store_true",
+                help="run the cloud tests (needs the esp32_cloud firmware in Wokwi and `az login`)")
+    c.addoption("--hub", default="coldtrace-hub-2db5", help="IoT Hub name")
+    c.addoption("--device-id", default="coldtrace-01", help="device identity the firmware uses")
+    c.addoption("--cloud-rg", default="coldtrace-rg", help="Azure resource group")
+    c.addoption("--storage", default="coldtracest2db5", help="storage account with the tables")
 
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config: pytest.Config) -> None:
     target = config.getoption("--target")
+    name = f"{target}-cloud" if config.getoption("--cloud") else target
     reports = REPO / "reports"
     reports.mkdir(exist_ok=True)
     if hasattr(config.option, "htmlpath") and not config.option.htmlpath:
-        config.option.htmlpath = str(reports / f"{target}-report.html")
+        config.option.htmlpath = str(reports / f"{name}-report.html")
         config.option.self_contained_html = True
     if not getattr(config.option, "xmlpath", None):
-        config.option.xmlpath = str(reports / f"{target}-junit.xml")
+        config.option.xmlpath = str(reports / f"{name}-junit.xml")
     config.stash[RUN_INFO] = {"target": target, "fw": "?", "commit": _git_commit()}
 
 
@@ -84,7 +92,13 @@ def _git_commit() -> str:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Known Wokwi limitations become xfail (with their reason) on that target only."""
+    """Cloud tests run only with --cloud. Known Wokwi limitations become xfail
+    (with their reason) on that target only."""
+    if not config.getoption("--cloud"):
+        skip = pytest.mark.skip(reason="cloud test: run with --cloud (esp32_cloud firmware + az login)")
+        for item in items:
+            if item.get_closest_marker("cloud"):
+                item.add_marker(skip)
     if config.getoption("--target") != "wokwi":
         return
     for item in items:
@@ -132,7 +146,11 @@ def device(target: Target, pytestconfig: pytest.Config):
         try:
             boot = dev.wait_for_boot(2)      # we may have connected after the BOOT line
         except DeviceTimeout:
-            boot = dev.restart()             # so ask for a fresh one
+            # Already running: ask for the version instead of rebooting it (a
+            # reboot of the cloud firmware costs ~40 s of reconnecting).
+            dev.send("")                     # end any partial line left in the terminal
+            resp = dev.command("VERSION", 5)
+            boot = BootInfo(fw=resp.args[0], reset="running") if resp.ok else dev.restart()
     pytestconfig.stash[RUN_INFO]["fw"] = boot.fw
     yield dev
     transport.close()
@@ -171,6 +189,81 @@ def fresh_device(device: DeviceClient) -> DeviceClient:
     device.restart()
     reset_state(device)
     return device
+
+
+# ---- cloud (ColdTrace) --------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def cloud(pytestconfig: pytest.Config):
+    from embedded_hil.cloud import CloudClient
+    return CloudClient(hub=pytestconfig.getoption("--hub"),
+                       device=pytestconfig.getoption("--device-id"),
+                       resource_group=pytestconfig.getoption("--cloud-rg"),
+                       storage_account=pytestconfig.getoption("--storage"))
+
+
+CLOUD_DEFAULTS = {"report_ms": 30000, "limit_c": 8, "window_s": 300}
+COLD_C = "4"            # a cold-chain baseline instead of Wokwi's default 24 C
+
+
+def net_info(dev: DeviceClient) -> dict[str, object]:
+    """NET as a dict: link, queued, acked, resends, dropped, next_seq, report_ms, boot."""
+    resp = dev.expect_ok("NET")
+    out: dict[str, object] = {}
+    for pair in resp.args:
+        key, _, value = pair.partition("=")
+        out[key] = int(value) if value.isdigit() else value
+    return out
+
+
+@pytest.fixture
+def cloud_ready(device: DeviceClient, cloud) -> DeviceClient:
+    """Known cloud state: no network faults, temperature held at 4 C, link up,
+    twin at the cold-chain defaults. Restores the same state afterwards."""
+    def settle() -> None:
+        device.expect_ok("FAULT NET OFF")
+        device.expect_ok("FAULT NOACK OFF")
+        device.expect_ok(f"FAULT TEMP {COLD_C}")
+        device.expect_ok(f"REPORT {CLOUD_DEFAULTS['report_ms']}")
+        if net_info(device)["link"] != "UP":
+            device.wait_for_event("NET_UP", 90)          # x4 on Wokwi: TLS takes ~35 s
+    settle()
+    reported = cloud.twin_reported()
+    if any(reported.get(k) != v for k, v in CLOUD_DEFAULTS.items()):
+        cloud.wait_reported_version(cloud.twin_update(CLOUD_DEFAULTS), 60)
+    device.clear_events()
+    mark = device.log_mark()
+    yield device
+    settle()
+    if any(cloud.twin_reported().get(k) != v for k, v in CLOUD_DEFAULTS.items()):
+        cloud.twin_update(CLOUD_DEFAULTS)
+
+    # Bug 005 guard: no watchdog reboot and no loop stall near the watchdog
+    # during the test. EVT GAP is printed from 500 ms; 1500 ms (half the
+    # watchdog) or more fails the test.
+    seen = [text for _, d, text in device.log[mark:] if d == "<-"]
+    hangs = sum(1 for _, d, text in device.log[mark:] if d == "->" and text == "FAULT HANG")
+    gaps = [int(t.split()[2]) for t in seen if t.startswith("EVT GAP ")]
+    cloud_results_gaps.extend(gaps)
+    wdt = [t for t in seen if t.startswith("BOOT ") and "reset=WATCHDOG" in t]
+    if len(wdt) > hangs or any(g >= 1500 for g in gaps):
+        pytest.fail(f"bug 005 guard: unexpected watchdog reboots {wdt} ({hangs} intended), "
+                    f"loop gaps (ms) {gaps}")
+
+
+cloud_results_gaps: list[int] = []   # every EVT GAP seen in cloud tests, for the summary
+
+
+@pytest.fixture(scope="session")
+def cloud_results():
+    """Numbers the cloud tests measure; written to reports/cloud-latency.json."""
+    results: dict[str, object] = {}
+    yield results
+    if results:
+        results["loop_gaps_ms_over_500"] = list(cloud_results_gaps)
+        import json
+        path = REPO / "reports" / "cloud-latency.json"
+        path.write_text(json.dumps(results, indent=2, default=str) + "\n", encoding="utf-8")
 
 
 # ---- reporting ----------------------------------------------------------------------

@@ -1,4 +1,4 @@
-# Serial command protocol — v1.0.0
+# Serial command protocol — v2.0.0
 
 The firmware is driven entirely over UART with plain-text commands. This document is the contract that the
 Project 1 test harness checks; every row below has at least one unit test in `firmware/test/test_logger.c`.
@@ -35,7 +35,7 @@ Project 1 test harness checks; every row below has at least one unit test in `fi
 | Command | Success response | Error responses | Notes |
 | --- | --- | --- | --- |
 | `PING` | `OK PONG` | `ERR ARGS` | Liveness check |
-| `VERSION` | `OK VERSION 1.0.0` | `ERR ARGS` | Firmware version |
+| `VERSION` | `OK VERSION 2.0.0` | `ERR ARGS` | Firmware version |
 | `STATUS` | `OK STATUS uptime_ms=<n> samples=<n> rate_ms=<n> sensor=OK\|LOST errors=<n> overflows=<n> reset=<reason>` | `ERR ARGS` | Fields always in this order |
 | `READ` | `OK TEMP 24.01` | `ERR SENSOR`, `ERR ARGS` | Immediate read, not stored |
 | `RATE <ms>` | `OK RATE 500` | `ERR ARGS`, `ERR RANGE` | Valid 100–60000; default 1000 |
@@ -93,7 +93,7 @@ receives duplicates.
 
 | Message | When |
 | --- | --- |
-| `BOOT fw=1.0.0 reset=POWERON\|SOFTWARE\|WATCHDOG\|OTHER` | Once after every start |
+| `BOOT fw=2.0.0 reset=POWERON\|SOFTWARE\|WATCHDOG\|OTHER` | Once after every start |
 | `EVT SENSOR_LOST` | 3 failed reads in a row (scheduled or `READ`), or the sensor was missing at boot |
 | `EVT SENSOR_OK` | The 5 s retry found the sensor again |
 | `EVT S <t_ms> <temp>` | A new sample while streaming is on |
@@ -112,7 +112,7 @@ receives duplicates.
 ## Example session
 
 ```text
-BOOT fw=1.0.0 reset=POWERON
+BOOT fw=2.0.0 reset=POWERON
 > PING
 OK PONG
 > RATE 500

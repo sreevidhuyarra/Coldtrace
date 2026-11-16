@@ -113,3 +113,11 @@ Other setup notes:
   verification on a simulated CPU). PUBACK round trip ~300 ms. Reconnect and ack timeouts must allow for both.
 - `esp-mqtt` (ESP-IDF) is available in Arduino-ESP32 2.0.17 via `#include "mqtt_client.h"`, so Block 4 can use
   QoS 1 acknowledgements as planned.
+
+Later ColdTrace findings (end-to-end tests, 2026-11-17):
+
+- IoT Hub accepted a device SAS token that had expired 10-60 s earlier, but refused one that expired 15
+  minutes earlier: expiry is enforced with some clock-skew grace. `HIL-CT-06` therefore signs tokens with
+  explicit past expiry times instead of waiting for a short token to lapse.
+- The Event Hubs trigger can run two Function instances on the same partition while ownership settles,
+  so the same backlog was processed twice at first start ([bug 006](bugs/006-orphaned-alert-from-concurrent-function-instances.md)).

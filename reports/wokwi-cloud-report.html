@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title id="head-title">Embedded HIL test report</title>
+      <style type="text/css">body {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  /* do not increase min-width as some may use split screens */
+  min-width: 800px;
+  color: #999;
+}
+
+h1 {
+  font-size: 24px;
+  color: black;
+}
+
+h2 {
+  font-size: 16px;
+  color: black;
+}
+
+p {
+  color: black;
+}
+
+a {
+  color: #999;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+/******************************
+ * SUMMARY INFORMATION
+ ******************************/
+#environment td {
+  padding: 5px;
+  border: 1px solid #e6e6e6;
+  vertical-align: top;
+}
+#environment tr:nth-child(odd) {
+  background-color: #f6f6f6;
+}
+#environment ul {
+  margin: 0;
+  padding: 0 20px;
+}
+
+/******************************
+ * TEST RESULT COLORS
+ ******************************/
+span.passed,
+.passed .col-result {
+  color: green;
+}
+
+span.skipped,
+span.xfailed,
+span.rerun,
+.skipped .col-result,
+.xfailed .col-result,
+.rerun .col-result {
+  color: orange;
+}
+
+span.error,
+span.failed,
+span.xpassed,
+.error .col-result,
+.failed .col-result,
+.xpassed .col-result {
+  color: red;
+}
+
+.col-links__extra {
+  margin-right: 3px;
+}
+
+/******************************
+ * RESULTS TABLE
+ *
+ * 1. Table Layout
+ * 2. Extra
+ * 3. Sorting items
+ *
+ ******************************/
+/*------------------
+ * 1. Table Layout
+ *------------------*/
+#results-table {
+  border: 1px solid #e6e6e6;
+  color: #999;
+  font-size: 12px;
+  width: 100%;
+}
+#results-table th,
+#results-table td {
+  padding: 5px;
+  border: 1px solid #e6e6e6;
+  text-align: left;
+}
+#results-table th {
+  font-weight: bold;
+}
+
+/*------------------
+ * 2. Extra
+ *------------------*/
+.logwrapper {
+  max-height: 230px;
+  overflow-y: scroll;
+  background-color: #e6e6e6;
+}
+.logwrapper.expanded {
+  max-height: none;
+}
+.logwrapper.expanded .logexpander:after {
+  content: "collapse [-]";
+}
+.logwrapper .logexpander {
+  z-index: 1;
+  position: sticky;
+  top: 10px;
+  width: max-content;
+  border: 1px solid;
+  border-radius: 3px;
+  padding: 5px 7px;
+  margin: 10px 0 10px calc(100% - 80px);
+  cursor: pointer;
+  background-color: #e6e6e6;
+}
+.logwrapper .logexpander:after {
+  content: "expand [+]";
+}
+.logwrapper .logexpander:hover {
+  color: #000;
+  border-color: #000;
+}
+.logwrapper .log {
+  min-height: 40px;
+  position: relative;
+  top: -50px;
+  height: calc(100% + 50px);
+  border: 1px solid #e6e6e6;
+  color: black;
+  display: block;
+  font-family: "Courier New", Courier, monospace;
+  padding: 5px;
+  padding-right: 80px;
+  white-space: pre-wrap;
+}
+
+div.media {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin: 0 5px;
+  overflow: hidden;
+  width: 320px;
+}
+
+.media-container {
+  display: grid;
+  grid-template-columns: 25px auto 25px;
+  align-items: center;
+  flex: 1 1;
+  overflow: hidden;
+  height: 200px;
+}
+
+.media-container--fullscreen {
+  grid-template-columns: 0px auto 0px;
+}
+
+.media-container__nav--right,
+.media-container__nav--left {
+  text-align: center;
+  cursor: pointer;
+}
+
+.media-container__viewport {
+  cursor: pointer;
+  text-align: center;
+  height: inherit;
+}
+.media-container__viewport img,
+.media-container__viewport video {
+  object-fit: cover;
+  width: 100%;
+  max-height: 100%;
+}
+
+.media__name,
+.media__counter {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  flex: 0 0 25px;
+  align-items: center;
+}
+
+.collapsible td:not(.col-links) {
+  cursor: pointer;
+}
+.collapsible td:not(.col-links):hover::after {
+  color: #bbb;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.col-result {
+  width: 130px;
+}
+.col-result:hover::after {
+  content: " (hide details)";
+}
+
+.col-result.collapsed:hover::after {
+  content: " (show details)";
+}
+
+#environment-header h2:hover::after {
+  content: " (hide details)";
+  color: #bbb;
+  font-style: italic;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+#environment-header.collapsed h2:hover::after {
+  content: " (show details)";
+  color: #bbb;
+  font-style: italic;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/*------------------
+ * 3. Sorting items
+ *------------------*/
+.sortable {
+  cursor: pointer;
+}
+.sortable.desc:after {
+  content: " ";
+  position: relative;
+  left: 5px;
+  bottom: -12.5px;
+  border: 10px solid #4caf50;
+  border-bottom: 0;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+.sortable.asc:after {
+  content: " ";
+  position: relative;
+  left: 5px;
+  bottom: 12.5px;
+  border: 10px solid #4caf50;
+  border-top: 0;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+
+.hidden, .summary__reload__button.hidden {
+  display: none;
+}
+
+.summary__data {
+  flex: 0 0 550px;
+}
+.summary__reload {
+  flex: 1 1;
+  display: flex;
+  justify-content: center;
+}
+.summary__reload__button {
+  flex: 0 0 300px;
+  display: flex;
+  color: white;
+  font-weight: bold;
+  background-color: #4caf50;
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.summary__reload__button:hover {
+  background-color: #46a049;
+}
+.summary__spacer {
+  flex: 0 0 550px;
+}
+
+.controls {
+  display: flex;
+  justify-content: space-between;
+}
+
+.filters,
+.collapse {
+  display: flex;
+  align-items: center;
+}
+.filters button,
+.collapse button {
+  color: #999;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.filters button:hover,
+.collapse button:hover {
+  color: #ccc;
+}
+
+.filter__label {
+  margin-right: 10px;
+}
+
+      </style>
+    
+  </head>
+  <body>
+    <h1 id="title">Embedded HIL test report</h1>
+    <p>Report generated on 17-Nov-2026 at 02:39:58 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a>
+        v4.2.0</p>
+    <div id="environment-header">
+      <h2>Environment</h2>
+    </div>
+    <table id="environment"></table>
+    <!-- TEMPLATES -->
+      <template id="template_environment_row">
+      <tr>
+        <td></td>
+        <td></td>
+      </tr>
+    </template>
+    <template id="template_results-table__body--empty">
+      <tbody class="results-table-row">
+        <tr id="not-found-message">
+          <td colspan="4">No results found. Check the filters.</td>
+        </tr>
+      </tbody>
+    </template>
+    <template id="template_results-table__tbody">
+      <tbody class="results-table-row">
+        <tr class="collapsible">
+        </tr>
+        <tr class="extras-row">
+          <td class="extra" colspan="4">
+            <div class="extraHTML"></div>
+            <div class="media">
+              <div class="media-container">
+                  <div class="media-container__nav--left">&lt;</div>
+                  <div class="media-container__viewport">
+                    <img src="" />
+                    <video controls>
+                      <source src="" type="video/mp4">
+                    </video>
+                  </div>
+                  <div class="media-container__nav--right">&gt;</div>
+                </div>
+                <div class="media__name"></div>
+                <div class="media__counter"></div>
+            </div>
+            <div class="logwrapper">
+              <div class="logexpander"></div>
+              <div class="log"></div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </template>
+    <!-- END TEMPLATES -->
+    <div class="summary">
+      <div class="summary__data">
+        <h2>Summary</h2>
+        <div class="additional-summary prefix">
+          <p><b>Target:</b> wokwi &nbsp; <b>Firmware:</b> 2.0.0 &nbsp; <b>Commit:</b> 4c77c51-dirty</p>
+        </div>
+        <p class="run-count">7 tests took 00:13:17.</p>
+        <p class="filter">(Un)check the boxes to filter the results.</p>
+        <div class="summary__reload">
+          <div class="summary__reload__button hidden" onclick="location.reload()">
+            <div>There are still tests running. <br />Reload this page to get the latest results!</div>
+          </div>
+        </div>
+        <div class="summary__spacer"></div>
+        <div class="controls">
+          <div class="filters">
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="failed" disabled>
+            <span class="failed">0 Failed,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="passed" >
+            <span class="passed">7 Passed,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="skipped" disabled>
+            <span class="skipped">0 Skipped,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="xfailed" disabled>
+            <span class="xfailed">0 Expected failures,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="xpassed" disabled>
+            <span class="xpassed">0 Unexpected passes,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="error" disabled>
+            <span class="error">0 Errors,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="rerun" disabled>
+            <span class="rerun">0 Reruns</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="retried" disabled>
+            <span class="retried">0 Retried,</span>
+          </div>
+          <div class="collapse">
+            <button id="show_all_details">Show all details</button>&nbsp;/&nbsp;<button id="hide_all_details">Hide all details</button>
+          </div>
+        </div>
+      </div>
+      <div class="additional-summary summary">
+      </div>
+      <div class="additional-summary postfix">
+      </div>
+    </div>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable" data-column-type="result">Result</th>
+          <th class="sortable" data-column-type="testId">Test</th>
+          <th class="sortable" data-column-type="duration">Duration</th>
+          <th>Links</th>
+        </tr>
+      </thead>
+    </table>
+  <footer>
+    <div id="data-container" data-jsonblob="{&#34;environment&#34;: {&#34;Python&#34;: &#34;3.12.5&#34;, &#34;Platform&#34;: &#34;Windows-11-10.0.26200-SP0&#34;, &#34;Packages&#34;: {&#34;pytest&#34;: &#34;9.2.0&#34;, &#34;pluggy&#34;: &#34;1.7.0&#34;}, &#34;Plugins&#34;: {&#34;html&#34;: &#34;4.2.0&#34;, &#34;metadata&#34;: &#34;3.1.1&#34;, &#34;random-order&#34;: &#34;1.2.0&#34;}}, &#34;tests&#34;: {&#34;tests/test_cloud.py::test_ingestion_latency&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_cloud.py::test_ingestion_latency&#34;, &#34;duration&#34;: &#34;00:02:34&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_cloud.py::test_ingestion_latency&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:02:34&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n   17.460s -&amp;gt; FAULT I2C OFF\n   17.650s &amp;lt;- OK FAULT I2C OFF\n   17.854s -&amp;gt; STREAM OFF\n   18.026s &amp;lt;- OK STREAM OFF\n   18.026s -&amp;gt; FAULT I2C OFF\n   18.247s &amp;lt;- OK FAULT I2C OFF\n   18.247s -&amp;gt; RATE 1000\n   18.460s &amp;lt;- OK RATE 1000\n   18.460s -&amp;gt; CLEAR\n   18.627s &amp;lt;- OK CLEAR\n   18.627s -&amp;gt; STATUS\n   18.751s &amp;lt;- OK STATUS uptime_ms=14301 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=0 reset=POWERON\n   18.967s -&amp;gt; FAULT NET OFF\n   19.102s &amp;lt;- OK FAULT NET OFF\n   19.102s -&amp;gt; FAULT NOACK OFF\n   19.272s &amp;lt;- OK FAULT NOACK OFF\n   19.272s -&amp;gt; FAULT TEMP 4\n   19.480s &amp;lt;- OK FAULT TEMP 4.00\n   19.480s -&amp;gt; REPORT 30000\n   19.662s &amp;lt;- OK REPORT 30000\n   19.662s -&amp;gt; NET\n   19.842s &amp;lt;- OK NET link=DOWN queued=1 acked=0 resends=0 dropped=0 next_seq=2 report_ms=30000 boot=34866af2\n   55.807s &amp;lt;- E (36251) esp-tls-mbedtls: mbedtls_ssl_handshake returned -0x0050\n   55.808s &amp;lt;- E (36252) esp-tls: Failed to open new connection\n   55.808s &amp;lt;- E (36253) TRANSPORT_BASE: Failed to open a new connection\n   55.808s &amp;lt;- E (36262) MQTT_CLIENT: Error transport connect\n   55.809s &amp;lt;- EVT NET_ERR type=1 connack=0 tls=0x50\n  122.781s &amp;lt;- EVT NET_UP\n  127.851s -&amp;gt; NET\n  127.851s &amp;lt;- EVT TWIN 16\n  127.851s &amp;lt;- EVT ACK 1\n  127.851s &amp;lt;- EVT ACK 2\n  127.851s &amp;lt;- EVT ACK 3\n  127.880s &amp;lt;- OK NET link=UP queued=0 acked=3 resends=0 dropped=0 next_seq=4 report_ms=30000 boot=5e7d04a2\n  127.880s -&amp;gt; SEND\n  127.905s &amp;lt;- OK SEND seq=4\n  129.541s -&amp;gt; SEND\n  129.541s &amp;lt;- EVT ACK 4\n  129.579s &amp;lt;- OK SEND seq=5\n  130.622s -&amp;gt; SEND\n  130.622s &amp;lt;- EVT ACK 5\n  130.657s &amp;lt;- OK SEND seq=6\n  131.744s -&amp;gt; SEND\n  131.744s &amp;lt;- EVT ACK 6\n  131.770s &amp;lt;- OK SEND seq=7\n  132.811s -&amp;gt; SEND\n  132.811s &amp;lt;- EVT ACK 7\n  132.839s &amp;lt;- OK SEND seq=8\n  133.944s -&amp;gt; SEND\n  133.944s &amp;lt;- EVT ACK 8\n  133.944s &amp;lt;- EVT ACK 9\n  133.969s &amp;lt;- OK SEND seq=10\n  135.051s -&amp;gt; SEND\n  135.051s &amp;lt;- EVT ACK 10\n  135.087s &amp;lt;- OK SEND seq=11\n  136.148s -&amp;gt; SEND\n  136.148s &amp;lt;- EVT ACK 11\n  136.172s &amp;lt;- OK SEND seq=12\n  137.358s -&amp;gt; SEND\n  137.358s &amp;lt;- EVT ACK 12\n  137.386s &amp;lt;- OK SEND seq=13\n  138.445s -&amp;gt; SEND\n  138.445s &amp;lt;- EVT ACK 13\n  138.477s &amp;lt;- OK SEND seq=14\n  139.568s -&amp;gt; SEND\n  139.568s &amp;lt;- EVT ACK 14\n  139.606s &amp;lt;- OK SEND seq=15&#34;}], &#34;tests/test_cloud.py::test_outage_loses_nothing&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_cloud.py::test_outage_loses_nothing&#34;, &#34;duration&#34;: &#34;00:03:38&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_cloud.py::test_outage_loses_nothing&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:03:38&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  153.967s -&amp;gt; STREAM OFF\n  153.995s &amp;lt;- OK STREAM OFF\n  153.995s -&amp;gt; FAULT I2C OFF\n  154.014s &amp;lt;- OK FAULT I2C OFF\n  154.014s -&amp;gt; RATE 1000\n  154.029s &amp;lt;- OK RATE 1000\n  154.029s -&amp;gt; CLEAR\n  154.045s &amp;lt;- OK CLEAR\n  154.045s -&amp;gt; STATUS\n  154.063s &amp;lt;- OK STATUS uptime_ms=112990 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=35 reset=POWERON\n  154.269s -&amp;gt; FAULT NET OFF\n  154.297s &amp;lt;- OK FAULT NET OFF\n  154.297s -&amp;gt; FAULT NOACK OFF\n  154.313s &amp;lt;- OK FAULT NOACK OFF\n  154.313s -&amp;gt; FAULT TEMP 4\n  154.330s &amp;lt;- OK FAULT TEMP 4.00\n  154.330s -&amp;gt; REPORT 30000\n  154.347s &amp;lt;- OK REPORT 30000\n  154.347s -&amp;gt; NET\n  154.363s &amp;lt;- OK NET link=UP queued=0 acked=15 resends=0 dropped=0 next_seq=16 report_ms=30000 boot=5e7d04a2\n  159.474s -&amp;gt; REPORT 5000\n  159.496s &amp;lt;- OK REPORT 5000\n  159.496s -&amp;gt; NET\n  159.516s &amp;lt;- OK NET link=UP queued=0 acked=15 resends=0 dropped=0 next_seq=16 report_ms=5000 boot=5e7d04a2\n  159.516s -&amp;gt; FAULT NET ON\n  159.558s &amp;lt;- OK FAULT NET ON\n  159.558s &amp;lt;- EVT NET_DOWN\n  279.559s -&amp;gt; NET\n  279.559s &amp;lt;- E (117088) TRANSPORT_BASE: poll_read select error 113, errno = Software caused connection abort, fd = 48\n  279.559s &amp;lt;- E (117089) MQTT_CLIENT: Poll read error: 119, aborting connection\n  279.559s &amp;lt;- E (131599) esp-tls: couldn&amp;#x27;t get hostname for :coldtrace-hub-2db5.device.azure-devices.net: getaddrinfo() returns 202, addrinfo=0x0\n  279.559s &amp;lt;- E (131600) esp-tls: Failed to open new connection\n  279.559s &amp;lt;- E (131604) TRANSPORT_BASE: Failed to open a new connection\n  279.559s &amp;lt;- E (131610) MQTT_CLIENT: Error transport connect\n  279.559s &amp;lt;- EVT NET_ERR type=1 connack=0 tls=0x0\n  279.559s &amp;lt;- E (146115) esp-tls: couldn&amp;#x27;t get hostname for :coldtrace-hub-2db5.device.azure-devices.net: getaddrinfo() returns 202, addrinfo=0x0\n  279.559s &amp;lt;- E (146116) esp-tls: Failed to open new connection\n  279.559s &amp;lt;- E (146120) TRANSPORT_BASE: Failed to open a new connection\n  279.559s &amp;lt;- E (146126) MQTT_CLIENT: Error transport connect\n  279.559s &amp;lt;- EVT NET_ERR type=1 connack=0 tls=0x0\n  279.559s &amp;lt;- E (160631) esp-tls: couldn&amp;#x27;t get hostname for :coldtrace-hub-2db5.device.azure-devices.net: getaddrinfo() returns 202, addrinfo=0x0\n  279.559s &amp;lt;- E (160632) esp-tls: Failed to open new connection\n  279.559s &amp;lt;- E (160636) TRANSPORT_BASE: Failed to open a new connection\n  279.559s &amp;lt;- E (160642) MQTT_CLIENT: Error transport connect\n  279.559s &amp;lt;- EVT NET_ERR type=1 connack=0 tls=0x0\n  279.559s &amp;lt;- E (175147) esp-tls: couldn&amp;#x27;t get hostname for :coldtrace-hub-2db5.device.azure-devices.net: getaddrinfo() returns 202, addrinfo=0x0\n  279.559s &amp;lt;- E (175148) esp-tls: Failed to open new connection\n  279.559s &amp;lt;- E (175152) TRANSPORT_BASE: Failed to open a new connection\n  279.559s &amp;lt;- E (175158) MQTT_CLIENT: Error transport connect\n  279.559s &amp;lt;- EVT NET_ERR type=1 connack=0 tls=0x0\n  279.559s &amp;lt;- E (189663) esp-tls: couldn&amp;#x27;t get hostname for :coldtrace-hub-2db5.device.azure-devices.net: getaddrinfo() returns 202, addrinfo=0x0\n  279.559s &amp;lt;- E (189664) esp-tls: Failed to open new connection\n  279.559s &amp;lt;- E (189668) TRANSPORT_BASE: Failed to open a new connection\n  279.559s &amp;lt;- E (189674) MQTT_CLIENT: Error transport connect\n  279.559s &amp;lt;- EVT NET_ERR type=1 connack=0 tls=0x0\n  279.559s &amp;lt;- E (204179) esp-tls: couldn&amp;#x27;t get hostname for :coldtrace-hub-2db5.device.azure-devices.net: getaddrinfo() returns 202, addrinfo=0x0\n  279.559s &amp;lt;- E (204180) esp-tls: Failed to open new connection\n  279.559s &amp;lt;- E (204184) TRANSPORT_BASE: Failed to open a new connection\n  279.559s &amp;lt;- E (204190) MQTT_CLIENT: Error transport connect\n  279.559s &amp;lt;- EVT NET_ERR type=1 connack=0 tls=0x0\n  279.559s &amp;lt;- E (218695) esp-tls: couldn&amp;#x27;t get hostname for :coldtrace-hub-2db5.device.azure-devices.net: getaddrinfo() returns 202, addrinfo=0x0\n  279.559s &amp;lt;- E (218696) esp-tls: Failed to open new connection\n  279.559s &amp;lt;- E (218700) TRANSPORT_BASE: Failed to open a new connection\n  279.559s &amp;lt;- E (218706) MQTT_CLIENT: Error transport connect\n  279.559s &amp;lt;- EVT NET_ERR type=1 connack=0 tls=0x0\n  279.559s &amp;lt;- E (233211) esp-tls: couldn&amp;#x27;t get hostname for :coldtrace-hub-2db5.device.azure-devices.net: getaddrinfo() returns 202, addrinfo=0x0\n  279.559s &amp;lt;- E (233212) esp-tls: Failed to open new connection\n  279.559s &amp;lt;- E (233216) TRANSPORT_BASE: Failed to open a new connection\n  279.559s &amp;lt;- E (233222) MQTT_CLIENT: Error transport connect\n  279.559s &amp;lt;- EVT NET_ERR type=1 connack=0 tls=0x0\n  279.578s &amp;lt;- OK NET link=DOWN queued=24 acked=15 resends=0 dropped=0 next_seq=40 report_ms=5000 boot=5e7d04a2\n  279.578s -&amp;gt; FAULT NET OFF\n  279.671s &amp;lt;- OK FAULT NET OFF\n  343.459s &amp;lt;- EVT NET_UP\n  343.914s &amp;lt;- EVT TWIN 16\n  343.966s &amp;lt;- EVT ACK 16\n  344.487s &amp;lt;- EVT ACK 17\n  344.838s &amp;lt;- EVT ACK 18\n  345.219s &amp;lt;- EVT ACK 19\n  345.583s &amp;lt;- EVT ACK 20\n  345.942s &amp;lt;- EVT ACK 21\n  346.307s &amp;lt;- EVT ACK 22\n  346.639s &amp;lt;- EVT ACK 23\n  346.994s &amp;lt;- EVT ACK 24\n  347.350s &amp;lt;- EVT ACK 25\n  347.710s &amp;lt;- EVT ACK 26\n  348.064s &amp;lt;- EVT ACK 27\n  348.410s &amp;lt;- EVT ACK 28\n  348.763s &amp;lt;- EVT ACK 29\n  349.115s &amp;lt;- EVT ACK 30\n  349.469s &amp;lt;- EVT ACK 31\n  349.809s &amp;lt;- EVT ACK 32\n  350.155s &amp;lt;- EVT ACK 33\n  350.511s &amp;lt;- EVT ACK 34\n  350.853s &amp;lt;- EVT ACK 35\n  351.197s &amp;lt;- EVT ACK 36\n  351.542s &amp;lt;- EVT ACK 37\n  351.893s &amp;lt;- EVT ACK 38\n  352.241s &amp;lt;- EVT ACK 39\n  356.660s -&amp;gt; NET\n  356.660s &amp;lt;- EVT ACK 40\n  356.660s &amp;lt;- EVT ACK 41\n  356.660s &amp;lt;- EVT ACK 42\n  356.660s &amp;lt;- EVT ACK 43\n  356.660s &amp;lt;- EVT ACK 44\n  356.660s &amp;lt;- EVT ACK 45\n  356.660s &amp;lt;- EVT ACK 46\n  356.660s &amp;lt;- EVT ACK 47\n  356.675s &amp;lt;- OK NET link=UP queued=0 acked=47 resends=0 dropped=0 next_seq=48 report_ms=30000 boot=5e7d04a2\n  357.094s -&amp;gt; NET\n  357.116s &amp;lt;- OK NET link=UP queued=0 acked=47 resends=0 dropped=0 next_seq=48 report_ms=30000 boot=5e7d04a2&#34;}], &#34;tests/test_cloud.py::test_replayed_readings_are_stored_once&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_cloud.py::test_replayed_readings_are_stored_once&#34;, &#34;duration&#34;: &#34;00:01:04&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_cloud.py::test_replayed_readings_are_stored_once&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:01:04&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  371.970s &amp;lt;- EVT ACK 48\n  372.183s -&amp;gt; STREAM OFF\n  372.210s &amp;lt;- OK STREAM OFF\n  372.210s -&amp;gt; FAULT I2C OFF\n  372.228s &amp;lt;- OK FAULT I2C OFF\n  372.228s -&amp;gt; RATE 1000\n  372.242s &amp;lt;- OK RATE 1000\n  372.242s -&amp;gt; CLEAR\n  372.259s &amp;lt;- OK CLEAR\n  372.259s -&amp;gt; STATUS\n  372.277s &amp;lt;- OK STATUS uptime_ms=307548 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=166 reset=POWERON\n  372.483s -&amp;gt; FAULT NET OFF\n  372.512s &amp;lt;- OK FAULT NET OFF\n  372.512s -&amp;gt; FAULT NOACK OFF\n  372.528s &amp;lt;- OK FAULT NOACK OFF\n  372.528s -&amp;gt; FAULT TEMP 4\n  372.543s &amp;lt;- OK FAULT TEMP 4.00\n  372.543s -&amp;gt; REPORT 30000\n  372.560s &amp;lt;- OK REPORT 30000\n  372.560s -&amp;gt; NET\n  372.578s &amp;lt;- OK NET link=UP queued=0 acked=48 resends=0 dropped=0 next_seq=49 report_ms=30000 boot=5e7d04a2\n  377.769s -&amp;gt; NET\n  377.793s &amp;lt;- OK NET link=UP queued=0 acked=48 resends=0 dropped=0 next_seq=49 report_ms=30000 boot=5e7d04a2\n  377.793s -&amp;gt; NET\n  377.810s &amp;lt;- OK NET link=UP queued=0 acked=48 resends=0 dropped=0 next_seq=49 report_ms=30000 boot=5e7d04a2\n  377.810s -&amp;gt; FAULT NOACK ON\n  377.829s &amp;lt;- OK FAULT NOACK ON\n  377.829s -&amp;gt; SEND\n  377.861s &amp;lt;- OK SEND seq=49\n  377.861s -&amp;gt; NET\n  377.901s &amp;lt;- OK NET link=UP queued=1 acked=48 resends=0 dropped=0 next_seq=50 report_ms=30000 boot=5e7d04a2\n  380.901s -&amp;gt; NET\n  380.926s &amp;lt;- OK NET link=UP queued=1 acked=48 resends=0 dropped=0 next_seq=50 report_ms=30000 boot=5e7d04a2\n  383.927s -&amp;gt; NET\n  383.942s &amp;lt;- OK NET link=UP queued=1 acked=48 resends=0 dropped=0 next_seq=50 report_ms=30000 boot=5e7d04a2\n  386.943s -&amp;gt; NET\n  386.959s &amp;lt;- OK NET link=UP queued=1 acked=48 resends=0 dropped=0 next_seq=50 report_ms=30000 boot=5e7d04a2\n  389.960s -&amp;gt; NET\n  389.974s &amp;lt;- OK NET link=UP queued=1 acked=48 resends=0 dropped=0 next_seq=50 report_ms=30000 boot=5e7d04a2\n  392.974s -&amp;gt; NET\n  392.992s &amp;lt;- OK NET link=UP queued=1 acked=48 resends=0 dropped=0 next_seq=50 report_ms=30000 boot=5e7d04a2\n  395.993s -&amp;gt; NET\n  396.009s &amp;lt;- OK NET link=UP queued=1 acked=48 resends=0 dropped=0 next_seq=50 report_ms=30000 boot=5e7d04a2\n  399.009s -&amp;gt; NET\n  399.026s &amp;lt;- OK NET link=UP queued=1 acked=48 resends=1 dropped=0 next_seq=50 report_ms=30000 boot=5e7d04a2\n  399.026s -&amp;gt; FAULT NOACK OFF\n  399.044s &amp;lt;- OK FAULT NOACK OFF\n  418.204s &amp;lt;- EVT ACK 49&#34;}], &#34;tests/test_cloud.py::test_twin_round_trip&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_cloud.py::test_twin_round_trip&#34;, &#34;duration&#34;: &#34;00:00:31&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_cloud.py::test_twin_round_trip&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:31&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  435.726s &amp;lt;- EVT ACK 51\n  435.931s -&amp;gt; STREAM OFF\n  435.987s &amp;lt;- OK STREAM OFF\n  435.987s -&amp;gt; FAULT I2C OFF\n  436.042s &amp;lt;- OK FAULT I2C OFF\n  436.042s -&amp;gt; RATE 1000\n  436.098s &amp;lt;- OK RATE 1000\n  436.098s -&amp;gt; CLEAR\n  436.153s &amp;lt;- OK CLEAR\n  436.153s -&amp;gt; STATUS\n  436.269s &amp;lt;- OK STATUS uptime_ms=371480 samples=1 rate_ms=1000 sensor=OK errors=0 overflows=166 reset=POWERON\n  436.483s -&amp;gt; FAULT NET OFF\n  436.556s &amp;lt;- OK FAULT NET OFF\n  436.556s -&amp;gt; FAULT NOACK OFF\n  436.654s &amp;lt;- OK FAULT NOACK OFF\n  436.654s -&amp;gt; FAULT TEMP 4\n  436.733s &amp;lt;- OK FAULT TEMP 4.00\n  436.733s -&amp;gt; REPORT 30000\n  436.786s &amp;lt;- OK REPORT 30000\n  436.786s -&amp;gt; NET\n  436.911s &amp;lt;- OK NET link=UP queued=0 acked=51 resends=2 dropped=0 next_seq=52 report_ms=30000 boot=5e7d04a2\n  450.655s &amp;lt;- EVT TWIN 17\n  456.006s -&amp;gt; CFG\n  456.006s &amp;lt;- EVT ACK 52\n  456.026s &amp;lt;- OK CFG report_ms=15000 limit_c=6.50 window_s=300 twin_version=17&#34;}], &#34;tests/test_cloud.py::test_excursion_raises_exactly_one_alert_then_clears&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_cloud.py::test_excursion_raises_exactly_one_alert_then_clears&#34;, &#34;duration&#34;: &#34;00:00:48&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_cloud.py::test_excursion_raises_exactly_one_alert_then_clears&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:48&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  466.989s &amp;lt;- EVT TWIN 18\n  467.198s -&amp;gt; STREAM OFF\n  467.249s &amp;lt;- OK STREAM OFF\n  467.250s -&amp;gt; FAULT I2C OFF\n  467.276s &amp;lt;- OK FAULT I2C OFF\n  467.276s -&amp;gt; RATE 1000\n  467.303s &amp;lt;- OK RATE 1000\n  467.303s -&amp;gt; CLEAR\n  467.324s &amp;lt;- OK CLEAR\n  467.324s -&amp;gt; STATUS\n  467.343s &amp;lt;- OK STATUS uptime_ms=402525 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=166 reset=POWERON\n  467.549s -&amp;gt; FAULT NET OFF\n  467.583s &amp;lt;- OK FAULT NET OFF\n  467.583s -&amp;gt; FAULT NOACK OFF\n  467.612s &amp;lt;- OK FAULT NOACK OFF\n  467.612s -&amp;gt; FAULT TEMP 4\n  467.627s &amp;lt;- OK FAULT TEMP 4.00\n  467.627s -&amp;gt; REPORT 30000\n  467.643s &amp;lt;- OK REPORT 30000\n  467.644s -&amp;gt; NET\n  467.669s &amp;lt;- OK NET link=UP queued=0 acked=52 resends=2 dropped=0 next_seq=53 report_ms=30000 boot=5e7d04a2\n  478.547s &amp;lt;- EVT TWIN 19\n  478.547s -&amp;gt; REPORT 1000\n  478.578s &amp;lt;- OK REPORT 1000\n  478.578s -&amp;gt; SEND\n  478.607s &amp;lt;- OK SEND seq=53\n  478.939s &amp;lt;- EVT ACK 53\n  478.939s -&amp;gt; FAULT TEMP 12\n  478.962s &amp;lt;- OK FAULT TEMP 12.00\n  490.647s -&amp;gt; FAULT TEMP 4\n  490.647s &amp;lt;- EVT ACK 54\n  490.647s &amp;lt;- EVT ACK 55\n  490.647s &amp;lt;- EVT ACK 56\n  490.647s &amp;lt;- EVT ACK 57\n  490.647s &amp;lt;- EVT ACK 58\n  490.647s &amp;lt;- EVT ACK 59\n  490.647s &amp;lt;- EVT ACK 60\n  490.647s &amp;lt;- EVT ACK 61\n  490.647s &amp;lt;- EVT ACK 62\n  490.647s &amp;lt;- EVT ACK 63\n  490.647s &amp;lt;- EVT ACK 64\n  490.647s &amp;lt;- EVT ACK 65\n  490.675s &amp;lt;- OK FAULT TEMP 4.00&#34;}], &#34;tests/test_cloud.py::test_expired_or_wrong_credentials_are_rejected&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_cloud.py::test_expired_or_wrong_credentials_are_rejected&#34;, &#34;duration&#34;: &#34;00:00:23&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_cloud.py::test_expired_or_wrong_credentials_are_rejected&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:23&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  514.555s &amp;lt;- EVT TWIN 20\n  514.765s -&amp;gt; STREAM OFF\n  514.793s &amp;lt;- OK STREAM OFF\n  514.793s -&amp;gt; FAULT I2C OFF\n  514.810s &amp;lt;- OK FAULT I2C OFF\n  514.810s -&amp;gt; RATE 1000\n  514.830s &amp;lt;- OK RATE 1000\n  514.830s -&amp;gt; CLEAR\n  514.840s &amp;lt;- OK CLEAR\n  514.840s -&amp;gt; STATUS\n  514.859s &amp;lt;- OK STATUS uptime_ms=450041 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=166 reset=POWERON&#34;}], &#34;tests/test_cloud.py::test_reboots_reconnect_without_watchdog_resets&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;tests/test_cloud.py::test_reboots_reconnect_without_watchdog_resets&#34;, &#34;duration&#34;: &#34;00:04:19&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;tests/test_cloud.py::test_reboots_reconnect_without_watchdog_resets&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:04:19&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;----------------------------- serial conversation ------------------------------\n  537.235s &amp;lt;- EVT ACK 68\n  537.447s -&amp;gt; STREAM OFF\n  537.474s &amp;lt;- OK STREAM OFF\n  537.474s -&amp;gt; FAULT I2C OFF\n  537.492s &amp;lt;- OK FAULT I2C OFF\n  537.492s -&amp;gt; RATE 1000\n  537.509s &amp;lt;- OK RATE 1000\n  537.509s -&amp;gt; CLEAR\n  537.524s &amp;lt;- OK CLEAR\n  537.524s -&amp;gt; STATUS\n  537.541s &amp;lt;- OK STATUS uptime_ms=472674 samples=0 rate_ms=1000 sensor=OK errors=0 overflows=166 reset=POWERON\n  537.744s -&amp;gt; FAULT NET OFF\n  537.758s &amp;lt;- OK FAULT NET OFF\n  537.758s -&amp;gt; FAULT NOACK OFF\n  537.775s &amp;lt;- OK FAULT NOACK OFF\n  537.775s -&amp;gt; FAULT TEMP 4\n  537.792s &amp;lt;- OK FAULT TEMP 4.00\n  537.793s -&amp;gt; REPORT 30000\n  537.810s &amp;lt;- OK REPORT 30000\n  537.810s -&amp;gt; NET\n  537.828s &amp;lt;- OK NET link=UP queued=0 acked=68 resends=2 dropped=0 next_seq=69 report_ms=30000 boot=5e7d04a2\n  543.585s -&amp;gt; RESET\n  543.624s &amp;lt;- OK RESET\n  543.732s &amp;lt;- ets Jul 29 2019 12:21:46\n  543.732s &amp;lt;- \n  543.754s &amp;lt;- rst:0xc (SW_CPU_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)\n  543.755s &amp;lt;- configsip: 0, SPIWP:0xee\n  543.755s &amp;lt;- clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00\n  543.755s &amp;lt;- mode:DIO, clock div:2\n  543.756s &amp;lt;- load:0x3fff0030,len:1156\n  543.785s &amp;lt;- load:0x40078000,len:11456\n  543.785s &amp;lt;- ho 0 tail 12 room 4\n  543.787s &amp;lt;- load:0x40080400,len:2972\n  543.787s &amp;lt;- entry 0x400805dc\n  545.716s &amp;lt;- BOOT fw=2.0.0 reset=SOFTWARE\n  545.716s -&amp;gt; FAULT TEMP 4\n  546.286s &amp;lt;- OK FAULT TEMP 4.00\n  546.357s &amp;lt;- EVT TASKS loop=10/1 mqtt=1/any\n  600.471s &amp;lt;- EVT NET_UP\n  600.471s -&amp;gt; NET\n  600.512s &amp;lt;- OK NET link=UP queued=2 acked=0 resends=0 dropped=0 next_seq=3 report_ms=30000 boot=66c92622\n  600.512s -&amp;gt; SEND\n  600.547s &amp;lt;- OK SEND seq=3\n  600.882s &amp;lt;- EVT TWIN 20\n  600.947s &amp;lt;- EVT ACK 1\n  601.427s &amp;lt;- EVT ACK 2\n  601.737s &amp;lt;- EVT ACK 3\n  601.933s -&amp;gt; RESET\n  601.965s &amp;lt;- OK RESET\n  602.265s &amp;lt;- ets Jul 29 2019 12:21:46\n  602.265s &amp;lt;- \n  602.266s &amp;lt;- rst:0xc (SW_CPU_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)\n  602.266s &amp;lt;- configsip: 0, SPIWP:0xee\n  602.267s &amp;lt;- clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00\n  602.284s &amp;lt;- mode:DIO, clock div:2\n  602.284s &amp;lt;- load:0x3fff0030,len:1156\n  602.285s &amp;lt;- load:0x40078000,len:11456\n  602.285s &amp;lt;- ho 0 tail 12 room 4\n  602.285s &amp;lt;- load:0x40080400,len:2972\n  602.285s &amp;lt;- entry 0x400805dc\n  604.010s &amp;lt;- BOOT fw=2.0.0 reset=SOFTWARE\n  604.010s -&amp;gt; FAULT TEMP 4\n  604.586s &amp;lt;- OK FAULT TEMP 4.00\n  604.639s &amp;lt;- EVT TASKS loop=10/1 mqtt=1/any\n  660.201s &amp;lt;- EVT NET_UP\n  660.201s -&amp;gt; NET\n  660.236s &amp;lt;- OK NET link=UP queued=2 acked=0 resends=0 dropped=0 next_seq=3 report_ms=30000 boot=c8376233\n  660.236s -&amp;gt; SEND\n  660.255s &amp;lt;- OK SEND seq=3\n  660.619s &amp;lt;- EVT TWIN 20\n  660.683s &amp;lt;- EVT ACK 1\n  661.184s &amp;lt;- EVT ACK 2\n  661.483s &amp;lt;- EVT ACK 3\n  661.685s -&amp;gt; RESET\n  661.711s &amp;lt;- OK RESET\n  661.978s &amp;lt;- ets Jul 29 2019 12:21:46\n  661.978s &amp;lt;- \n  661.978s &amp;lt;- rst:0xc (SW_CPU_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)\n  661.978s &amp;lt;- configsip: 0, SPIWP:0xee\n  661.979s &amp;lt;- clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00\n  661.995s &amp;lt;- mode:DIO, clock div:2\n  661.995s &amp;lt;- load:0x3fff0030,len:1156\n  661.996s &amp;lt;- load:0x40078000,len:11456\n  661.996s &amp;lt;- ho 0 tail 12 room 4\n  661.996s &amp;lt;- load:0x40080400,len:2972\n  661.996s &amp;lt;- entry 0x400805dc\n  663.775s &amp;lt;- BOOT fw=2.0.0 reset=SOFTWARE\n  663.775s -&amp;gt; FAULT TEMP 4\n  664.335s &amp;lt;- OK FAULT TEMP 4.00\n  664.393s &amp;lt;- EVT TASKS loop=10/1 mqtt=1/any\n  718.797s &amp;lt;- EVT NET_UP\n  718.797s -&amp;gt; NET\n  718.860s &amp;lt;- OK NET link=UP queued=2 acked=0 resends=0 dropped=0 next_seq=3 report_ms=30000 boot=f413775f\n  718.861s -&amp;gt; SEND\n  718.878s &amp;lt;- OK SEND seq=3\n  719.224s &amp;lt;- EVT TWIN 20\n  719.290s &amp;lt;- EVT ACK 1\n  720.149s &amp;lt;- EVT ACK 2\n  720.467s &amp;lt;- EVT ACK 3\n  720.673s -&amp;gt; FAULT HANG\n  720.687s &amp;lt;- OK FAULT HANG\n  723.845s &amp;lt;- E (47482) task_wdt: Task watchdog got triggered. The following tasks did not reset the watchdog in time:\n  723.845s &amp;lt;- E (47482) task_wdt:  - loopTask (CPU 1)\n  724.267s &amp;lt;- E (47482) task_wdt: Tasks currently running:\n  724.267s &amp;lt;- E (47482) task_wdt: CPU 0: IDLE0\n  724.268s &amp;lt;- E (47482) task_wdt: CPU 1: IDLE1\n  724.268s &amp;lt;- E (47482) task_wdt: Aborting.\n  724.268s &amp;lt;- \n  724.269s &amp;lt;- abort() was called at PC 0x400e2b81 on core 0\n  724.269s &amp;lt;- \n  724.269s &amp;lt;- \n  724.269s &amp;lt;- Backtrace: 0x40083b11:0x3ffbeccc |&amp;lt;-CORRUPTED\n  724.269s &amp;lt;- \n  724.269s &amp;lt;- \n  724.269s &amp;lt;- \n  724.269s &amp;lt;- \n  724.269s &amp;lt;- ELF file SHA256: db51abff1d9aef65\n  724.269s &amp;lt;- \n  724.891s &amp;lt;- Rebooting...\n  724.891s &amp;lt;- ets Jul 29 2019 12:21:46\n  724.891s &amp;lt;- \n  724.891s &amp;lt;- rst:0xc (SW_CPU_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)\n  724.892s &amp;lt;- configsip: 0, SPIWP:0xee\n  724.892s &amp;lt;- clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00\n  724.892s &amp;lt;- mode:DIO, clock div:2\n  724.910s &amp;lt;- load:0x3fff0030,len:1156\n  724.910s &amp;lt;- load:0x40078000,len:11456\n  724.910s &amp;lt;- ho 0 tail 12 room 4\n  724.911s &amp;lt;- load:0x40080400,len:2972\n  724.911s &amp;lt;- entry 0x400805dc\n  726.794s &amp;lt;- BOOT fw=2.0.0 reset=WATCHDOG\n  726.794s -&amp;gt; FAULT TEMP 4\n  726.794s &amp;lt;- EVT WDT_STAGE 5\n  727.441s &amp;lt;- OK FAULT TEMP 4.00\n  727.515s &amp;lt;- EVT TASKS loop=10/1 mqtt=1/any\n  781.982s &amp;lt;- EVT NET_UP&#34;}]}, &#34;renderCollapsed&#34;: [&#34;passed&#34;], &#34;initialSort&#34;: &#34;result&#34;, &#34;title&#34;: &#34;Embedded HIL test report&#34;}"></div>
+    <script>
+      (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+const { getCollapsedCategory, setCollapsedIds } = require('./storage.js')
+
+class DataManager {
+    setManager(data) {
+        const collapsedCategories = [...getCollapsedCategory(data.renderCollapsed)]
+        const collapsedIds = []
+        const tests = Object.values(data.tests).flat().map((test, index) => {
+            const collapsed = collapsedCategories.includes(test.result.toLowerCase())
+            const id = `test_${index}`
+            if (collapsed) {
+                collapsedIds.push(id)
+            }
+            return {
+                ...test,
+                id,
+                collapsed,
+            }
+        })
+        const dataBlob = { ...data, tests }
+        this.data = { ...dataBlob }
+        this.renderData = { ...dataBlob }
+        setCollapsedIds(collapsedIds)
+    }
+
+    get allData() {
+        return { ...this.data }
+    }
+
+    resetRender() {
+        this.renderData = { ...this.data }
+    }
+
+    setRender(data) {
+        this.renderData.tests = [...data]
+    }
+
+    toggleCollapsedItem(id) {
+        this.renderData.tests = this.renderData.tests.map((test) =>
+            test.id === id ? { ...test, collapsed: !test.collapsed } : test,
+        )
+    }
+
+    set allCollapsed(collapsed) {
+        this.renderData = { ...this.renderData, tests: [...this.renderData.tests.map((test) => (
+            { ...test, collapsed }
+        ))] }
+    }
+
+    get testSubset() {
+        return [...this.renderData.tests]
+    }
+
+    get environment() {
+        return this.renderData.environment
+    }
+
+    get initialSort() {
+        return this.data.initialSort
+    }
+}
+
+module.exports = {
+    manager: new DataManager(),
+}
+
+},{"./storage.js":8}],2:[function(require,module,exports){
+const mediaViewer = require('./mediaviewer.js')
+const templateEnvRow = document.getElementById('template_environment_row')
+const templateResult = document.getElementById('template_results-table__tbody')
+
+function htmlToElements(html) {
+    const temp = document.createElement('template')
+    temp.innerHTML = html
+    return temp.content.childNodes
+}
+
+const find = (selector, elem) => {
+    if (!elem) {
+        elem = document
+    }
+    return elem.querySelector(selector)
+}
+
+const findAll = (selector, elem) => {
+    if (!elem) {
+        elem = document
+    }
+    return [...elem.querySelectorAll(selector)]
+}
+
+const dom = {
+    getStaticRow: (key, value) => {
+        const envRow = templateEnvRow.content.cloneNode(true)
+        const isObj = typeof value === 'object' && value !== null
+        const values = isObj ? Object.keys(value).map((k) => `${k}: ${value[k]}`) : null
+
+        const valuesElement = htmlToElements(
+            values ? `<ul>${values.map((val) => `<li>${val}</li>`).join('')}<ul>` : `<div>${value}</div>`)[0]
+        const td = findAll('td', envRow)
+        td[0].textContent = key
+        td[1].appendChild(valuesElement)
+
+        return envRow
+    },
+    getResultTBody: ({ testId, id, log, extras, resultsTableRow, tableHtml, result, collapsed }) => {
+        const resultBody = templateResult.content.cloneNode(true)
+        resultBody.querySelector('tbody').classList.add(result.toLowerCase())
+        resultBody.querySelector('tbody').id = testId
+        resultBody.querySelector('.collapsible').dataset.id = id
+
+        resultsTableRow.forEach((html) => {
+            const t = document.createElement('template')
+            t.innerHTML = html
+            resultBody.querySelector('.collapsible').appendChild(t.content)
+        })
+
+        if (log) {
+            // Wrap lines starting with "E" with span.error to color those lines red
+            const wrappedLog = log.replace(/^E.*$/gm, (match) => `<span class="error">${match}</span>`)
+            resultBody.querySelector('.log').innerHTML = wrappedLog
+        } else {
+            resultBody.querySelector('.log').remove()
+        }
+
+        if (collapsed) {
+            resultBody.querySelector('.collapsible > .col-result')?.classList.add('collapsed')
+            resultBody.querySelector('.extras-row').classList.add('hidden')
+        } else {
+            resultBody.querySelector('.collapsible > .col-result')?.classList.remove('collapsed')
+        }
+
+        const media = []
+        extras?.forEach(({ name, format_type, content }) => {
+            if (['image', 'video'].includes(format_type)) {
+                media.push({ path: content, name, format_type })
+            }
+
+            if (format_type === 'html') {
+                resultBody.querySelector('.extraHTML').insertAdjacentHTML('beforeend', `<div>${content}</div>`)
+            }
+        })
+        mediaViewer.setup(resultBody, media)
+
+        // Add custom html from the pytest_html_results_table_html hook
+        tableHtml?.forEach((item) => {
+            resultBody.querySelector('td[class="extra"]').insertAdjacentHTML('beforeend', item)
+        })
+
+        return resultBody
+    },
+}
+
+module.exports = {
+    dom,
+    htmlToElements,
+    find,
+    findAll,
+}
+
+},{"./mediaviewer.js":6}],3:[function(require,module,exports){
+const { manager } = require('./datamanager.js')
+const { doSort } = require('./sort.js')
+const storageModule = require('./storage.js')
+
+const getFilteredSubSet = (filter) =>
+    manager.allData.tests.filter(({ result }) => filter.includes(result.toLowerCase()))
+
+const doInitFilter = () => {
+    const currentFilter = storageModule.getVisible()
+    const filteredSubset = getFilteredSubSet(currentFilter)
+    manager.setRender(filteredSubset)
+}
+
+const doFilter = (type, show) => {
+    if (show) {
+        storageModule.showCategory(type)
+    } else {
+        storageModule.hideCategory(type)
+    }
+
+    const currentFilter = storageModule.getVisible()
+    const filteredSubset = getFilteredSubSet(currentFilter)
+    manager.setRender(filteredSubset)
+
+    const sortColumn = storageModule.getSort()
+    doSort(sortColumn, true)
+}
+
+module.exports = {
+    doFilter,
+    doInitFilter,
+}
+
+},{"./datamanager.js":1,"./sort.js":7,"./storage.js":8}],4:[function(require,module,exports){
+const { redraw, bindEvents, renderStatic } = require('./main.js')
+const { doInitFilter } = require('./filter.js')
+const { doInitSort } = require('./sort.js')
+const { manager } = require('./datamanager.js')
+const data = JSON.parse(document.getElementById('data-container').dataset.jsonblob)
+
+function init() {
+    manager.setManager(data)
+    doInitFilter()
+    doInitSort()
+    renderStatic()
+    redraw()
+    bindEvents()
+}
+
+init()
+
+},{"./datamanager.js":1,"./filter.js":3,"./main.js":5,"./sort.js":7}],5:[function(require,module,exports){
+const { dom, find, findAll } = require('./dom.js')
+const { manager } = require('./datamanager.js')
+const { doSort } = require('./sort.js')
+const { doFilter } = require('./filter.js')
+const {
+    getVisible,
+    getCollapsedIds,
+    setCollapsedIds,
+    getSort,
+    getSortDirection,
+    possibleFilters,
+} = require('./storage.js')
+
+const removeChildren = (node) => {
+    while (node.firstChild) {
+        node.removeChild(node.firstChild)
+    }
+}
+
+const renderStatic = () => {
+    const renderEnvironmentTable = () => {
+        const environment = manager.environment
+        const rows = Object.keys(environment).map((key) => dom.getStaticRow(key, environment[key]))
+        const table = document.getElementById('environment')
+        removeChildren(table)
+        rows.forEach((row) => table.appendChild(row))
+    }
+    renderEnvironmentTable()
+}
+
+const addItemToggleListener = (elem) => {
+    elem.addEventListener('click', ({ target }) => {
+        const id = target.parentElement.dataset.id
+        manager.toggleCollapsedItem(id)
+
+        const collapsedIds = getCollapsedIds()
+        if (collapsedIds.includes(id)) {
+            const updated = collapsedIds.filter((item) => item !== id)
+            setCollapsedIds(updated)
+        } else {
+            collapsedIds.push(id)
+            setCollapsedIds(collapsedIds)
+        }
+        redraw()
+    })
+}
+
+const renderContent = (tests) => {
+    const sortAttr = getSort(manager.initialSort)
+    const sortAsc = JSON.parse(getSortDirection())
+    const rows = tests.map(dom.getResultTBody)
+    const table = document.getElementById('results-table')
+    const tableHeader = document.getElementById('results-table-head')
+
+    const newTable = document.createElement('table')
+    newTable.id = 'results-table'
+
+    // remove all sorting classes and set the relevant
+    findAll('.sortable', tableHeader).forEach((elem) => elem.classList.remove('asc', 'desc'))
+    tableHeader.querySelector(`.sortable[data-column-type="${sortAttr}"]`)?.classList.add(sortAsc ? 'desc' : 'asc')
+    newTable.appendChild(tableHeader)
+
+    if (!rows.length) {
+        const emptyTable = document.getElementById('template_results-table__body--empty').content.cloneNode(true)
+        newTable.appendChild(emptyTable)
+    } else {
+        rows.forEach((row) => {
+            if (!!row) {
+                findAll('.collapsible td:not(.col-links', row).forEach(addItemToggleListener)
+                find('.logexpander', row).addEventListener('click',
+                    (evt) => evt.target.parentNode.classList.toggle('expanded'),
+                )
+                newTable.appendChild(row)
+            }
+        })
+    }
+
+    table.replaceWith(newTable)
+}
+
+const renderDerived = () => {
+    const currentFilter = getVisible()
+    possibleFilters.forEach((result) => {
+        const input = document.querySelector(`input[data-test-result="${result}"]`)
+        input.checked = currentFilter.includes(result)
+    })
+}
+
+const bindEvents = () => {
+    const filterColumn = (evt) => {
+        const { target: element } = evt
+        const { testResult } = element.dataset
+
+        doFilter(testResult, element.checked)
+        const collapsedIds = getCollapsedIds()
+        const updated = manager.renderData.tests.map((test) => {
+            return {
+                ...test,
+                collapsed: collapsedIds.includes(test.id),
+            }
+        })
+        manager.setRender(updated)
+        redraw()
+    }
+
+    const header = document.getElementById('environment-header')
+    header.addEventListener('click', () => {
+        const table = document.getElementById('environment')
+        table.classList.toggle('hidden')
+        header.classList.toggle('collapsed')
+    })
+
+    findAll('input[name="filter_checkbox"]').forEach((elem) => {
+        elem.addEventListener('click', filterColumn)
+    })
+
+    findAll('.sortable').forEach((elem) => {
+        elem.addEventListener('click', (evt) => {
+            const { target: element } = evt
+            const { columnType } = element.dataset
+            doSort(columnType)
+            redraw()
+        })
+    })
+
+    document.getElementById('show_all_details').addEventListener('click', () => {
+        manager.allCollapsed = false
+        setCollapsedIds([])
+        redraw()
+    })
+    document.getElementById('hide_all_details').addEventListener('click', () => {
+        manager.allCollapsed = true
+        const allIds = manager.renderData.tests.map((test) => test.id)
+        setCollapsedIds(allIds)
+        redraw()
+    })
+}
+
+const redraw = () => {
+    const { testSubset } = manager
+
+    renderContent(testSubset)
+    renderDerived()
+}
+
+module.exports = {
+    redraw,
+    bindEvents,
+    renderStatic,
+}
+
+},{"./datamanager.js":1,"./dom.js":2,"./filter.js":3,"./sort.js":7,"./storage.js":8}],6:[function(require,module,exports){
+class MediaViewer {
+    constructor(assets) {
+        this.assets = assets
+        this.index = 0
+    }
+
+    nextActive() {
+        this.index = this.index === this.assets.length - 1 ? 0 : this.index + 1
+        return [this.activeFile, this.index]
+    }
+
+    prevActive() {
+        this.index = this.index === 0 ? this.assets.length - 1 : this.index -1
+        return [this.activeFile, this.index]
+    }
+
+    get currentIndex() {
+        return this.index
+    }
+
+    get activeFile() {
+        return this.assets[this.index]
+    }
+}
+
+
+const setup = (resultBody, assets) => {
+    if (!assets.length) {
+        resultBody.querySelector('.media').classList.add('hidden')
+        return
+    }
+
+    const mediaViewer = new MediaViewer(assets)
+    const container = resultBody.querySelector('.media-container')
+    const leftArrow = resultBody.querySelector('.media-container__nav--left')
+    const rightArrow = resultBody.querySelector('.media-container__nav--right')
+    const mediaName = resultBody.querySelector('.media__name')
+    const counter = resultBody.querySelector('.media__counter')
+    const imageEl = resultBody.querySelector('img')
+    const sourceEl = resultBody.querySelector('source')
+    const videoEl = resultBody.querySelector('video')
+
+    const setImg = (media, index) => {
+        if (media?.format_type === 'image') {
+            imageEl.src = media.path
+
+            imageEl.classList.remove('hidden')
+            videoEl.classList.add('hidden')
+        } else if (media?.format_type === 'video') {
+            sourceEl.src = media.path
+
+            videoEl.classList.remove('hidden')
+            imageEl.classList.add('hidden')
+        }
+
+        mediaName.innerText = media?.name
+        counter.innerText = `${index + 1} / ${assets.length}`
+    }
+    setImg(mediaViewer.activeFile, mediaViewer.currentIndex)
+
+    const moveLeft = () => {
+        const [media, index] = mediaViewer.prevActive()
+        setImg(media, index)
+    }
+    const doRight = () => {
+        const [media, index] = mediaViewer.nextActive()
+        setImg(media, index)
+    }
+    const openImg = () => {
+        window.open(mediaViewer.activeFile.path, '_blank')
+    }
+    if (assets.length === 1) {
+        container.classList.add('media-container--fullscreen')
+    } else {
+        leftArrow.addEventListener('click', moveLeft)
+        rightArrow.addEventListener('click', doRight)
+    }
+    imageEl.addEventListener('click', openImg)
+}
+
+module.exports = {
+    setup,
+}
+
+},{}],7:[function(require,module,exports){
+const { manager } = require('./datamanager.js')
+const storageModule = require('./storage.js')
+
+const genericSort = (list, key, ascending, customOrder) => {
+    let sorted
+    if (customOrder) {
+        sorted = list.sort((a, b) => {
+            const aValue = a.result.toLowerCase()
+            const bValue = b.result.toLowerCase()
+
+            const aIndex = customOrder.findIndex((item) => item.toLowerCase() === aValue)
+            const bIndex = customOrder.findIndex((item) => item.toLowerCase() === bValue)
+
+            // Compare the indices to determine the sort order
+            return aIndex - bIndex
+        })
+    } else {
+        sorted = list.sort((a, b) => a[key] === b[key] ? 0 : a[key] > b[key] ? 1 : -1)
+    }
+
+    if (ascending) {
+        sorted.reverse()
+    }
+    return sorted
+}
+
+const durationSort = (list, ascending) => {
+    const parseDuration = (duration) => {
+        if (duration.includes(':')) {
+            // If it's in the format "HH:mm:ss"
+            const [hours, minutes, seconds] = duration.split(':').map(Number)
+            return (hours * 3600 + minutes * 60 + seconds) * 1000
+        } else {
+            // If it's in the format "nnn ms"
+            return parseInt(duration)
+        }
+    }
+    const sorted = list.sort((a, b) => parseDuration(a['duration']) - parseDuration(b['duration']))
+    if (ascending) {
+        sorted.reverse()
+    }
+    return sorted
+}
+
+const doInitSort = () => {
+    const type = storageModule.getSort(manager.initialSort)
+    const ascending = storageModule.getSortDirection()
+    const list = manager.testSubset
+    const initialOrder = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed', 'Skipped', 'Passed']
+
+    storageModule.setSort(type)
+    storageModule.setSortDirection(ascending)
+
+    if (type?.toLowerCase() === 'original') {
+        manager.setRender(list)
+    } else {
+        let sortedList
+        switch (type) {
+        case 'duration':
+            sortedList = durationSort(list, ascending)
+            break
+        case 'result':
+            sortedList = genericSort(list, type, ascending, initialOrder)
+            break
+        default:
+            sortedList = genericSort(list, type, ascending)
+            break
+        }
+        manager.setRender(sortedList)
+    }
+}
+
+const doSort = (type, skipDirection) => {
+    const newSortType = storageModule.getSort(manager.initialSort) !== type
+    const currentAsc = storageModule.getSortDirection()
+    let ascending
+    if (skipDirection) {
+        ascending = currentAsc
+    } else {
+        ascending = newSortType ? false : !currentAsc
+    }
+    storageModule.setSort(type)
+    storageModule.setSortDirection(ascending)
+
+    const list = manager.testSubset
+    const sortedList = type === 'duration' ? durationSort(list, ascending) : genericSort(list, type, ascending)
+    manager.setRender(sortedList)
+}
+
+module.exports = {
+    doInitSort,
+    doSort,
+}
+
+},{"./datamanager.js":1,"./storage.js":8}],8:[function(require,module,exports){
+const possibleFilters = [
+    'passed',
+    'skipped',
+    'failed',
+    'error',
+    'xfailed',
+    'xpassed',
+    'rerun',
+]
+
+const getVisible = () => {
+    const url = new URL(window.location.href)
+    const settings = new URLSearchParams(url.search).get('visible')
+    const lower = (item) => {
+        const lowerItem = item.toLowerCase()
+        if (possibleFilters.includes(lowerItem)) {
+            return lowerItem
+        }
+        return null
+    }
+    return settings === null ?
+        possibleFilters :
+        [...new Set(settings?.split(',').map(lower).filter((item) => item))]
+}
+
+const hideCategory = (categoryToHide) => {
+    const url = new URL(window.location.href)
+    const visibleParams = new URLSearchParams(url.search).get('visible')
+    const currentVisible = visibleParams ? visibleParams.split(',') : [...possibleFilters]
+    const settings = [...new Set(currentVisible)].filter((f) => f !== categoryToHide).join(',')
+
+    url.searchParams.set('visible', settings)
+    window.history.pushState({}, null, unescape(url.href))
+}
+
+const showCategory = (categoryToShow) => {
+    if (typeof window === 'undefined') {
+        return
+    }
+    const url = new URL(window.location.href)
+    const currentVisible = new URLSearchParams(url.search).get('visible')?.split(',').filter(Boolean) ||
+        [...possibleFilters]
+    const settings = [...new Set([categoryToShow, ...currentVisible])]
+    const noFilter = possibleFilters.length === settings.length || !settings.length
+
+    noFilter ? url.searchParams.delete('visible') : url.searchParams.set('visible', settings.join(','))
+    window.history.pushState({}, null, unescape(url.href))
+}
+
+const getSort = (initialSort) => {
+    const url = new URL(window.location.href)
+    let sort = new URLSearchParams(url.search).get('sort')
+    if (!sort) {
+        sort = initialSort || 'result'
+    }
+    return sort
+}
+
+const setSort = (type) => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('sort', type)
+    window.history.pushState({}, null, unescape(url.href))
+}
+
+const getCollapsedCategory = (renderCollapsed) => {
+    let categories
+    if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href)
+        const collapsedItems = new URLSearchParams(url.search).get('collapsed')
+        switch (true) {
+        case !renderCollapsed && collapsedItems === null:
+            categories = ['passed']
+            break
+        case collapsedItems?.length === 0 || /^["']{2}$/.test(collapsedItems):
+            categories = []
+            break
+        case /^all$/.test(collapsedItems) || collapsedItems === null && /^all$/.test(renderCollapsed):
+            categories = [...possibleFilters]
+            break
+        default:
+            categories = collapsedItems?.split(',').map((item) => item.toLowerCase()) || renderCollapsed
+            break
+        }
+    } else {
+        categories = []
+    }
+    return categories
+}
+
+const getSortDirection = () => JSON.parse(sessionStorage.getItem('sortAsc')) || false
+const setSortDirection = (ascending) => sessionStorage.setItem('sortAsc', ascending)
+
+const getCollapsedIds = () => JSON.parse(sessionStorage.getItem('collapsedIds')) || []
+const setCollapsedIds = (list) => sessionStorage.setItem('collapsedIds', JSON.stringify(list))
+
+module.exports = {
+    getVisible,
+    hideCategory,
+    showCategory,
+    getCollapsedIds,
+    setCollapsedIds,
+    getSort,
+    setSort,
+    getSortDirection,
+    setSortDirection,
+    getCollapsedCategory,
+    possibleFilters,
+}
+
+},{}]},{},[4]);
+    </script>
+  </footer>
+  </body>
+</html>

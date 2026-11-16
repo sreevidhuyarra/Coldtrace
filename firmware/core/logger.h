@@ -23,7 +23,7 @@
 #include "ring_buffer.h"
 #include "twin.h"
 
-#define LOGGER_FW_VERSION        "1.0.0"
+#define LOGGER_FW_VERSION        "2.0.0"
 #define LOGGER_RATE_DEFAULT_MS   1000u
 #define LOGGER_RATE_MIN_MS       100u
 #define LOGGER_RATE_MAX_MS       60000u

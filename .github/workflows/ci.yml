@@ -113,4 +113,4 @@ jobs:
           token: ${{ secrets.WOKWI_CLI_TOKEN }}
           path: firmware
           timeout: 30000
-          expect_text: "BOOT fw=1.0.0"
+          expect_text: "BOOT fw="

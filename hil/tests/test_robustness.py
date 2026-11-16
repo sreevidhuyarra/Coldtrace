@@ -45,5 +45,5 @@ def test_flood_of_100_commands_all_answered_in_order(device):
     burst = b"".join(b"PING\n" if i % 2 == 0 else b"VERSION\n" for i in range(100))
     device.send_raw(burst)
     for i in range(100):
-        expected = "OK PONG" if i % 2 == 0 else "OK VERSION 1.0.0"
+        expected = "OK PONG" if i % 2 == 0 else "OK VERSION 2.0.0"
         assert device.read_response(2).raw == expected, f"response {i}"

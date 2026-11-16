@@ -14,6 +14,9 @@
 #include <WiFi.h>
 #include <esp_log.h>
 #include <esp_system.h>
+#include <esp_task_wdt.h>
+#include <soc/timer_group_reg.h>
+#include <soc/timer_group_struct.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <time.h>
@@ -48,6 +51,9 @@ static const char *T_TWIN_DESIRED  = "$iothub/twin/PATCH/properties/desired/";
 static const char *T_METHOD        = "$iothub/methods/POST/";
 
 RTC_NOINIT_ATTR volatile uint32_t g_cloud_stage;
+/* Set just before a requested restart; checked and cleared at the next boot. */
+RTC_NOINIT_ATTR static volatile uint32_t g_restart_requested;
+static const uint32_t RESTART_MAGIC = 0x52535431u;   /* "RST1" */
 
 static esp_mqtt_client_handle_t s_mqtt;
 static QueueHandle_t            s_queue;
@@ -177,13 +183,29 @@ static void mqtt_start(void)
 
 static void wifi_join(void)
 {
+    WiFi.persistent(false);                   /* no flash writes of the Wi-Fi config: a flash
+                                                 write stalls both CPUs (bug 005) */
     WiFi.setAutoReconnect(true);
     WiFi.begin(WIFI_SSID, "", WIFI_CHANNEL);  /* returns at once; joins in the background */
 }
 
-void cloud_begin(logger_t *lg)
+reset_reason_t cloud_check_requested_restart(reset_reason_t reason, bool *chained)
 {
-    if (lg->reset_reason == RESET_WATCHDOG) {
+    /* A watchdog reset inside a restart we asked for (the flag was set right
+     * before esp_restart() and nothing has run since) is still a software
+     * reset; say so, and report the chain so it stays visible. A real hang
+     * (FAULT HANG) never sets the flag, so it still reads WATCHDOG. */
+    bool requested = (g_restart_requested == RESTART_MAGIC);
+    g_restart_requested = 0;
+    *chained = requested && reason == RESET_WATCHDOG;
+    return *chained ? RESET_SOFTWARE : reason;
+}
+
+void cloud_begin(logger_t *lg, bool reset_chained)
+{
+    if (reset_chained) {
+        Serial.printf("EVT RESET_CHAIN sw>wdt\r\n");
+    } else if (lg->reset_reason == RESET_WATCHDOG) {
         Serial.printf("EVT WDT_STAGE %lu\r\n", (unsigned long)g_cloud_stage);
     }
     g_cloud_stage = 0;
@@ -201,6 +223,39 @@ void cloud_begin(logger_t *lg)
     configTime(0, 0, "pool.ntp.org", "time.google.com");   /* for the boot id; never for latency */
 
     logger_attach_net(lg, &s_net, DEVICE_ID, esp_random());
+}
+
+/* ---- restart ---------------------------------------------------------------------- */
+
+void cloud_prepare_restart(void)
+{
+    /* A shutdown with the network up takes a moment; the reboot that follows
+     * makes the task watchdog's guarantee moot, so stop watching the loop. */
+    esp_task_wdt_delete(NULL);
+
+    CLOUD_STAGE(STAGE_RESTART_MQTT);
+    if (s_mqtt != nullptr) {
+        esp_mqtt_client_stop(s_mqtt);
+    }
+    CLOUD_STAGE(STAGE_RESTART_WIFI);
+    WiFi.disconnect(true, false);             /* radio off */
+    delay(50);
+
+    /* In Wokwi the first boot after RESET was killed 0.6 s into the bootloader
+     * by the timer-group-1 watchdog (TG1WDT_SYS_RESET): the timer groups keep
+     * their "flash boot protection" bit across a CPU reset, the bit re-arms
+     * the watchdog while booting from flash, and loading this 920 KB image
+     * takes longer than it allows. Clear the bit (and the watchdog) on both
+     * timer groups; esp_restart() follows within microseconds. */
+    CLOUD_STAGE(STAGE_RESTART_CALL);
+    timg_dev_t *groups[] = { &TIMERG0, &TIMERG1 };
+    for (timg_dev_t *g : groups) {
+        g->wdt_wprotect = TIMG_WDT_WKEY_VALUE;
+        g->wdt_config0.flashboot_mod_en = 0;
+        g->wdt_config0.en = 0;
+        g->wdt_wprotect = 0;
+    }
+    g_restart_requested = RESTART_MAGIC;      /* survives the reset: see cloud_begin() */
 }
 
 /* ---- loop ------------------------------------------------------------------------ */
@@ -236,6 +291,26 @@ static void settle_boot_id(logger_t *lg)
         lg->pub.boot_id ^= (uint32_t)now;
     }
     s_boot_id_set = true;
+}
+
+/* Once, after the MQTT task exists: print the real priority and CPU of the
+ * loop and MQTT tasks (EVT TASKS loop=<prio>/<core> mqtt=<prio>/<affinity>),
+ * so the scheduling assumptions in bug 005 are checked, not assumed. */
+static void report_tasks(void)
+{
+    static bool s_done;
+    if (s_done || !s_mqtt_started) {
+        return;
+    }
+    TaskHandle_t mqtt = xTaskGetHandle("mqtt_task");
+    if (mqtt == nullptr) {
+        return;
+    }
+    s_done = true;
+    BaseType_t aff = xTaskGetAffinity(mqtt);
+    Serial.printf("EVT TASKS loop=%u/%d mqtt=%u/%s\r\n", (unsigned)uxTaskPriorityGet(NULL), xPortGetCoreID(),
+                  (unsigned)uxTaskPriorityGet(mqtt),
+                  aff == tskNO_AFFINITY ? "any" : (aff == 0 ? "0" : "1"));
 }
 
 static bool starts_with(const char *s, const char *prefix)
@@ -346,6 +421,7 @@ void cloud_loop(logger_t *lg)
 
     CLOUD_STAGE(STAGE_BOOT_ID);
     settle_boot_id(lg);
+    report_tasks();
 }
 
 #endif /* COLDTRACE_CLOUD */
