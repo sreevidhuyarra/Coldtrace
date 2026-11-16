@@ -136,7 +136,7 @@ Credentials come from the tester's `az login`; nothing secret is in the reposito
 
 Levels: 46 Unity tests for store and forward and the twin reader (`test_publisher`, `test_logger_net`,
 `test_twin`), 35 pytest tests for the cloud logic with an in-memory store (`azure/tests`), and the seven
-end-to-end tests below. Final run 2026-11-17: **7 / 7 pass** in 13 min.
+end-to-end tests below. Final run 2026-11-17: **7 / 7 pass** in 10 min (device on the hub's main host name, RSA chain).
 
 Rules: latency is measured with cloud clocks (IoT Hub enqueue → stored) or the PC's clock at both ends,
 never the device's (Wokwi's clock drifts). Every cloud test starts from link up, no faults, temperature held
@@ -145,10 +145,10 @@ device reboots by watchdog or reports a loop stall of 1.5 s or more (bug 005 gua
 
 | Req | Requirement | Test | Unit tests | Result |
 | --- | --- | --- | --- | --- |
-| C-01 | Readings reach storage quickly | HIL-CT-01 | — | Pass: ingest p50 37 ms, p95 46 ms |
-| C-02 | A 2-minute outage loses nothing; every seq stored once | HIL-CT-02 | `test_two_minute_outage_backlog_*`, `test_fault_net_*` | Pass: 24 / 24, no gaps |
+| C-01 | Readings reach storage quickly | HIL-CT-01 | — | Pass: ingest p50 38 ms, p95 45 ms |
+| C-02 | A 2-minute outage loses nothing; every seq stored once | HIL-CT-02 | `test_two_minute_outage_backlog_*`, `test_fault_net_*` | Pass: 21 / 21, no gaps |
 | C-03 | Readings sent more than once are stored once and counted | HIL-CT-03 | `test_each_reading_is_stored_once_*`, `test_fault_noack_*` | Pass: 3 copies, 1 row |
-| C-04 | Twin settings are validated, applied and reported back | HIL-CT-04 | `test_twin_*` (logger, parser) | Pass: ~8 s device, ~14 s cloud |
+| C-04 | Twin settings are validated, applied and reported back | HIL-CT-04 | `test_twin_*` (logger, parser) | Pass: ~7 s device, ~11 s cloud |
 | C-05 | Above the limit past the window: exactly one alert, then clears | HIL-CT-05 | `test_excursion_*`, `test_two_instances_racing_*` | Pass |
 | C-06 | Tampered, wrong-key and expired credentials are refused | HIL-CT-06 | — | Pass |
 | C-07 | `RESET` comes back `SOFTWARE` and reconnects; a hang still reads `WATCHDOG` | HIL-CT-07 | — | Pass: 3 / 3 `SOFTWARE`, hang → `WATCHDOG` |

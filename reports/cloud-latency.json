@@ -1,40 +1,40 @@
 {
   "ingest_ms": {
     "n": 10,
-    "p50": 37.3,
-    "p95": 46.3,
-    "max": 46.3,
+    "p50": 38.3,
+    "p95": 45.4,
+    "max": 45.4,
     "clock": "cloud: IoT Hub enqueue -> Function stored"
   },
   "send_to_row_ms": {
     "n": 10,
-    "p50": 1102,
-    "p95": 1210,
+    "p50": 1050,
+    "p95": 1147,
     "clock": "PC: SEND command -> row visible (includes Wokwi and 0.25 s polling)"
   },
   "outage": {
     "outage_s": 120,
-    "readings_queued": 24,
-    "recovered_s": 77.1,
+    "readings_queued": 21,
+    "recovered_s": 15.5,
     "dropped": 0
   },
   "replay": {
-    "seq": 49,
+    "seq": 38,
     "copies_received": 3,
     "rows": 1
   },
   "twin_round_trip_s": {
-    "device_applied": 8.1,
-    "reported_in_cloud": 13.58,
+    "device_applied": 6.63,
+    "reported_in_cloud": 11.36,
     "note": "PC clock from just before the az update call, so both include az CLI start-up (~2-4 s per call)"
   },
   "excursion": {
-    "alert": "coldtrace-01-5e7d04a2-0000414403",
+    "alert": "coldtrace-01-8ef3a204-0000577776",
     "limit_c": 8.0,
     "window_s": 10,
     "raised_temp": 12.0,
     "cleared_temp": 4.0,
-    "seen_raised_after_s": 16.7
+    "seen_raised_after_s": 16.3
   },
   "security": {
     "valid_token": "accepted",
@@ -45,9 +45,9 @@
   },
   "reboots": {
     "reboot_to_stored_s": [
-      58.3,
-      59.8,
-      59.0
+      21.6,
+      11.2,
+      11.4
     ],
     "reset_chain_events": 0,
     "hang_reset_reason": "WATCHDOG"

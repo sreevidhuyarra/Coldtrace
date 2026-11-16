@@ -175,16 +175,16 @@ each of those behaviours against the real Azure services. Firmware 2.0.0, tag `v
 
 | Test | What it proves | Result |
 | --- | --- | --- |
-| HIL-CT-01 Ingestion latency | Readings reach storage fast (cloud clocks: IoT Hub enqueue → stored) | p50 **37 ms**, p95 **46 ms**; PC `SEND` → row visible p50 1.1 s (includes Wokwi and polling) |
-| HIL-CT-02 Network outage | Wi-Fi down 2 minutes: every reading arrives exactly once | 24 readings queued, **all 24 stored, no gaps, 0 dropped**; recovered in ~75 s (Wokwi TLS handshake) |
+| HIL-CT-01 Ingestion latency | Readings reach storage fast (cloud clocks: IoT Hub enqueue → stored) | p50 **38 ms**, p95 **45 ms**; PC `SEND` → row visible p50 1.05 s (includes Wokwi and polling) |
+| HIL-CT-02 Network outage | Wi-Fi down 2 minutes: every reading arrives exactly once | 21 readings queued, **all 21 stored, no gaps, 0 dropped**; link back and backlog delivered in ~16 s |
 | HIL-CT-03 Duplicates | A reading sent 3 times is stored once and counted | 3 copies received, **1 row** |
-| HIL-CT-04 Twin round trip | A cloud setting is applied and confirmed | device applied in ~8 s, confirmed in the cloud in ~14 s (PC clock, includes `az` CLI start-up) |
+| HIL-CT-04 Twin round trip | A cloud setting is applied and confirmed | device applied in ~7 s, confirmed in the cloud in ~11 s (PC clock, includes `az` CLI start-up) |
 | HIL-CT-05 Excursion alert | Above the limit past the window: exactly one alert, then clears | 1 alert at 12 °C against 8 °C / 10 s; cleared at 4 °C |
 | HIL-CT-06 Security | Bad credentials are refused | valid token accepted; tampered signature, wrong key, and a token expired 15 min ago refused |
-| HIL-CT-07 Reboots | `RESET` three times: back as `SOFTWARE`, reconnected, delivering; a real hang still reads `WATCHDOG` | 3 / 3 `SOFTWARE`, reboot to stored reading ~59 s; hang → `WATCHDOG` ([bug 005](docs/bugs/005-watchdog-reset-during-tls-handshake.md)) |
+| HIL-CT-07 Reboots | `RESET` three times: back as `SOFTWARE`, reconnected, delivering; a real hang still reads `WATCHDOG` | 3 / 3 `SOFTWARE`, reboot to stored reading 11-22 s; hang → `WATCHDOG` ([bug 005](docs/bugs/005-watchdog-reset-during-tls-handshake.md)) |
 
 Every cloud test also fails if the device reboots by watchdog or its loop stalls for 1.5 s or more while
-the test runs; in the final 13-minute run no loop stall reached even 500 ms. Numbers are in `reports/cloud-latency.json`.
+the test runs; in the final run no loop stall reached even 500 ms. Numbers are in `reports/cloud-latency.json`.
 
 ### Bugs found
 
@@ -206,9 +206,9 @@ and the VS Code Wokwi extension.
 1. **Cloud side:** create an IoT Hub (`--sku F1`) and a device `coldtrace-01`, then run
    `./azure/deploy.ps1 -Hub <hub> -Suffix <unique>`. It creates the storage account, the Function's consumer
    group and the Function App, and deploys `azure/function_app`.
-2. **Credentials:** copy `firmware/src/secrets.example.h` to `firmware/src/secrets.h` (git-ignored) and fill
-   in the hub's **device** host name (`az iot hub show -n <hub> --query properties.deviceHostName`) and a
-   SAS token (`az iot hub generate-sas-token -n <hub> -d coldtrace-01 --du 2592000`).
+2. **Credentials:** `.venv/Scripts/python azure/device_token.py --hub <hub>` writes
+   `firmware/src/secrets.h` (git-ignored) with the hub's main host name and a 30-day device SAS token
+   (see `firmware/src/secrets.example.h` for why that host).
 3. **Firmware:** `cd firmware && pio run -e esp32_cloud`, open `firmware/cloud/diagram.json` in VS Code,
    F1 → **Wokwi: Start Simulator**.
 4. **Tests:** `cd hil && pytest --target wokwi --cloud -m cloud --hub <hub> --storage <account>`.
@@ -221,7 +221,7 @@ Serial commands added for ColdTrace (full list in the [protocol](docs/protocol.m
 ### Honest limits
 
 - **The device is simulated.** The firmware is real ESP32 code running in Wokwi, which runs slower than
-  real time (the TLS handshake takes ~35 s); it has not run on a physical board.
+  real time; it has not run on a physical board.
 - **The outage is simulated** with `FAULT NET`, which really drops Wi-Fi and the MQTT session; pytest cannot
   switch Wokwi's network off from outside.
 - **The security test connects from the PC** as a second device identity (`coldtrace-sec`), because IoT Hub

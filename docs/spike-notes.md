@@ -121,3 +121,9 @@ Later ColdTrace findings (end-to-end tests, 2026-11-17):
   explicit past expiry times instead of waiting for a short token to lapse.
 - The Event Hubs trigger can run two Function instances on the same partition while ownership settles,
   so the same backlog was processed twice at first start ([bug 006](bugs/006-orphaned-alert-from-concurrent-function-instances.md)).
+- Host name revisited: the main host `<hub>.azure-devices.net` accepts device SAS tokens too, provided the
+  token is signed for that host (the Day 1 refusal was only the host/token mismatch). Its chain is RSA
+  (DigiCert Global Root G2), and RSA signatures are much cheaper to verify than the device host's ECC
+  chain. With the device host, Wokwi handshakes sometimes ran past Azure's limit (`-0x0050`, reset by
+  the server; seen twice in a row on a busy PC), so the firmware now uses the main host;
+  `azure/device_token.py` signs the token for it.
