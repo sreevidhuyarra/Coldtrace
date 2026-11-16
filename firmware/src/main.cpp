@@ -19,6 +19,10 @@ extern "C" {
 #include "logger.h"
 }
 
+#ifdef COLDTRACE_CLOUD
+#include "cloud.h"           /* Wi-Fi + MQTT to Azure IoT Hub (esp32_cloud build) */
+#endif
+
 #ifndef ESP_ARDUINO_VERSION_MAJOR
 #define ESP_ARDUINO_VERSION_MAJOR 2
 #endif
@@ -113,6 +117,13 @@ static void watchdog_start(void)
     esp_task_wdt_init(WDT_TIMEOUT_S, true);   /* panic = reboot on timeout */
 #endif
     esp_task_wdt_add(NULL);                   /* watch the loop task */
+#ifdef COLDTRACE_CLOUD
+    /* Arduino-ESP32 also subscribes core 0's idle task. With Wi-Fi, the MQTT
+     * task verifies the TLS certificate chain on core 0 (~31 s simulated in
+     * Wokwi), the idle task starves past 3 s and the panic reboots the chip.
+     * The guarantee we make is about the loop task, which stays watched. */
+    esp_task_wdt_delete(xTaskGetIdleTaskHandleForCPU(0));
+#endif
 }
 
 /* ---- Arduino entry points ----------------------------------------------- */
@@ -129,18 +140,39 @@ void setup()
     reset_reason_t reason = map_reset_reason(esp_reset_reason());
     watchdog_start();
     logger_init(&g_logger, &g_hal, reason);
+#ifdef COLDTRACE_CLOUD
+    /* The control loop outranks the MQTT task (priority 1): when its 1 ms
+     * sleep ends it preempts the TLS work at once. At equal priority the
+     * ESP32's SMP scheduler did not reliably share the core, and a reconnect
+     * handshake starved loop() inside delay(1) for over 3 s (EVT WDT_STAGE 6,
+     * docs/bugs/005). */
+    vTaskPrioritySet(NULL, 2);
+    cloud_begin(&g_logger);
+#endif
 }
+
+#ifndef COLDTRACE_CLOUD
+#define CLOUD_STAGE(n) ((void)0)              /* crash breadcrumbs: cloud build only */
+#endif
 
 void loop()
 {
+    CLOUD_STAGE(STAGE_FEED);
     esp_task_wdt_reset();                     /* 1. feed the watchdog */
 
+    CLOUD_STAGE(STAGE_SERIAL);
     while (Serial.available() > 0) {          /* 2. commands */
         logger_rx_byte(&g_logger, (char)Serial.read());
     }
 
-    logger_tick(&g_logger);                   /* 3-4. sampling, sensor retry */
+#ifdef COLDTRACE_CLOUD
+    CLOUD_STAGE(STAGE_CLOUD);
+    cloud_loop(&g_logger);                    /* acks, link state, FAULT NET */
+#endif
+    CLOUD_STAGE(STAGE_TICK);
+    logger_tick(&g_logger);                   /* 3-4. sampling, sensor retry, publish */
 
+    CLOUD_STAGE(STAGE_ACTION);
     switch (logger_take_action(&g_logger)) {  /* 5. pending actions */
     case ACT_RESET:
         Serial.flush();                       /* let "OK RESET" go out first */
@@ -155,4 +187,13 @@ void loop()
     default:
         break;
     }
+
+#ifdef COLDTRACE_CLOUD
+    /* Give the CPU away for 1 ms per pass. The loop outranks the MQTT task, so
+     * a loop that never blocks would starve the TLS handshake until Azure
+     * resets the connection (-0x0050). 1 ms is far below the 4 KB UART
+     * buffer's ~350 ms of input at 115200 baud. */
+    CLOUD_STAGE(STAGE_IDLE);
+    delay(1);
+#endif
 }

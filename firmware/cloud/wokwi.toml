@@ -1,0 +1,8 @@
+# ColdTrace: runs the esp32_cloud build (Wi-Fi + MQTT to Azure IoT Hub).
+# Open cloud/diagram.json in VS Code, then F1 -> Wokwi: Start Simulator.
+[wokwi]
+version = 1
+firmware = '../.pio/build/esp32_cloud/firmware.bin'
+elf = '../.pio/build/esp32_cloud/firmware.elf'
+# Same serial port as the plain firmware, for the HIL harness: rfc2217://localhost:4000
+rfc2217ServerPort = 4000

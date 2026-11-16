@@ -18,6 +18,20 @@ jobs:
       - name: Build and run the firmware core unit tests
         run: make test
 
+  cloud-unit:
+    name: Cloud pipeline unit tests (ColdTrace Function logic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pytest
+        run: pip install pytest==9.2.0
+      - name: Run the pipeline tests (no Azure needed)
+        working-directory: azure
+        run: pytest
+
   hil-sim:
     name: HIL suite on the host simulator
     needs: unit
@@ -62,9 +76,9 @@ jobs:
           key: pio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
       - name: Install PlatformIO
         run: pip install platformio
-      - name: Build esp32 and esp32_test
+      - name: Build esp32, esp32_test and esp32_cloud
         working-directory: firmware
-        run: pio run -e esp32 -e esp32_test
+        run: pio run -e esp32 -e esp32_test -e esp32_cloud   # cloud: placeholder credentials
       - name: Upload firmware images
         uses: actions/upload-artifact@v4
         with:
