@@ -1,6 +1,6 @@
 # ESP32 Temperature Logger, HIL Test Harness and ColdTrace
 
-[![CI](https://github.com/sreevidhuyarra/esp32-logger/actions/workflows/ci.yml/badge.svg)](https://github.com/sreevidhuyarra/esp32-logger/actions/workflows/ci.yml)
+[![CI](https://github.com/sreevidhuyarra/Coldtrace/actions/workflows/ci.yml/badge.svg)](https://github.com/sreevidhuyarra/Coldtrace/actions/workflows/ci.yml)
 
 Three projects in one repository, each built on the one before:
 
@@ -22,7 +22,7 @@ No hardware is needed for any of it.
 ## Quick start
 
 ```sh
-git clone --recursive https://github.com/sreevidhuyarra/esp32-logger.git && cd esp32-logger
+git clone --recursive https://github.com/sreevidhuyarra/Coldtrace.git && cd Coldtrace
 make test sim                               # 115 unit tests, then build the host simulator
 pip install -r hil/requirements.txt         # Python 3.12
 cd hil && pytest --target sim               # 38 HIL tests -> reports/sim-report.html
@@ -39,7 +39,7 @@ On Windows, use MSYS2's make (`C:\msys64\usr\bin\make.exe test sim`); everything
 | ColdTrace end-to-end, Wokwi + Azure | 7 / 7 pass ([below](#results-1)) | [reports/wokwi-cloud-report.html](reports/wokwi-cloud-report.html) |
 | HIL, host simulator | 38 / 38 pass in ~34 s; also in random order | [reports/sim-report.html](reports/sim-report.html) |
 | HIL, Wokwi (real firmware) | 36 pass, 1 not applicable, 1 known Wokwi limitation (xfail) | [reports/wokwi-report.html](reports/wokwi-report.html) |
-| CI (GitHub Actions) | unit, HIL on simulator, firmware build, optional Wokwi boot check | [Actions](https://github.com/sreevidhuyarra/esp32-logger/actions) |
+| CI (GitHub Actions) | unit, HIL on simulator, firmware build, optional Wokwi boot check | [Actions](https://github.com/sreevidhuyarra/Coldtrace/actions) |
 
 ![HIL test report](docs/img/hil-report.png)
 
