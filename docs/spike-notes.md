@@ -78,3 +78,38 @@ Harness rule: allow about 5 s from `OK FAULT HANG` to the next `BOOT` line.
 
 - [x] Spike 1: **GO** — Wokwi's MPU6050 temperature model works
 - [x] Spike 2: **GO** — Wokwi emulates the watchdog reset; reason reads INT_WDT, mapped to WATCHDOG
+- [x] Spike 3 (ColdTrace): **GO**, see below
+
+## Spike 3 — ColdTrace: Wokwi ESP32 to Azure IoT Hub (`spike/cloud`)
+
+Date: 2026-11-16. Question: inside the Wokwi **VS Code extension**, can the ESP32 join Wi-Fi, reach the hub on
+port 8883, and publish over MQTT/TLS with a SAS token? Hub `coldtrace-hub-2db5` (F1, UAE North).
+
+| Step | Result |
+| --- | --- |
+| 1. Join `Wokwi-GUEST` | PASS, 100-200 ms, IP 10.13.37.2 |
+| 2. DNS + TCP to port 8883 | PASS, ~300 ms connect; NTP also works (UTC correct) |
+| 3. MQTT/TLS + SAS token, QoS 1 | PASS after two fixes below; readings seq 1-5 seen by `az iot hub monitor-events` |
+
+Two findings, neither in the plan nor in the usual tutorials:
+
+1. **Newer hubs have a separate device host name.** `az iot hub show` lists `hostName`
+   (`<hub>.azure-devices.net`), `deviceHostName` (`<hub>.device.azure-devices.net`) and `serviceHostName`.
+   `az iot hub generate-sas-token -d` signs for the *device* host. Connecting to the plain host with that token
+   gives CONNACK 5 (not authorised), even though DNS and TLS succeed (same gateway IP). Fix: devices connect
+   to `deviceHostName`. Confirmed from the PC with paho-mqtt before re-running Wokwi.
+2. **The device host uses a different certificate chain.** `<hub>.device.azure-devices.net` presents an ECC
+   chain (Microsoft TLS G2 ECC CA, Microsoft TLS ECC Root G2, cross-signed by **DigiCert Global Root G3**);
+   the plain host uses RSA (MSFT RS256 CA-1, DigiCert Global Root G2). With only G2 embedded, mbedTLS failed
+   with `-0x2700`, flags `0x8` (not trusted). Fix: embed G2, G3 and Microsoft RSA Root 2017 (`azure_ca.h`,
+   exported from the Windows trust store); verified with `openssl s_client -CAfile` trusting only those three.
+
+Other setup notes:
+
+- Azure for Students allows only five regions; of those only UAE North and Korea Central offer IoT Hub.
+- Azure CLI 2.93 creates hubs with `disableLocalAuth=true` (SAS off). The design uses SAS tokens, so it was
+  set back to `false` for this development hub. Production would use Entra ID and X.509 device certificates.
+- The TLS handshake takes ~12 s of simulated time in Wokwi (ECC verify on a simulated CPU). Reconnect logic
+  must allow for it.
+- `esp-mqtt` (ESP-IDF) is available in Arduino-ESP32 2.0.17 via `#include "mqtt_client.h"`, so Block 4 can use
+  QoS 1 acknowledgements as planned.

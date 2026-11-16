@@ -7,3 +7,7 @@ build/
 reports/*.xml
 __pycache__/
 .pytest_cache/
+
+# credentials: never commit SAS tokens or keys
+secrets.h
+*.secrets.json
