@@ -10,10 +10,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
+from azure.core import MatchConditions
+from azure.core.exceptions import ResourceExistsError, ResourceModifiedError, ResourceNotFoundError
 from azure.data.tables import EdmType, EntityProperty, TableServiceClient, UpdateMode
 
-from pipeline import DeviceState, Reading
+from pipeline import DeviceState, Reading, StateConflict
 
 READINGS, DEVICES, ALERTS = "readings", "devices", "alerts"
 
@@ -37,6 +38,7 @@ class TableStore:
         entity = {
             "PartitionKey": r.device, "RowKey": r.row_key,
             "boot": r.boot, "seq": _i64(r.seq), "t_ms": _i64(r.t_ms), "temp": float(r.temp),
+            "limit_c": float(r.limit_c), "window_s": int(r.window_s),
             "enqueued_at": r.enqueued_at, "stored_at": stored_at,
             # cloud clocks only: hub receive time -> Function store time
             "ingest_ms": float((stored_at - r.enqueued_at).total_seconds() * 1000.0),
@@ -68,6 +70,7 @@ class TableStore:
             open_alert=e.get("open_alert") or None,
             last_seen=e.get("last_seen"),
             last_temp=e.get("last_temp"),
+            etag=e.metadata["etag"],
         )
 
     def put_state(self, device: str, s: DeviceState) -> None:
@@ -81,7 +84,37 @@ class TableStore:
             entity["last_seen"] = s.last_seen
         if s.last_temp is not None:
             entity["last_temp"] = float(s.last_temp)
-        self.devices.upsert_entity(entity, mode=UpdateMode.REPLACE)
+        # Optimistic concurrency (bug 006): write only the version we read.
+        try:
+            if s.etag is None:
+                self.devices.create_entity(entity)            # fails if another instance created it
+            else:
+                self.devices.update_entity(entity, mode=UpdateMode.REPLACE, etag=s.etag,
+                                           match_condition=MatchConditions.IfNotModified)
+        except (ResourceExistsError, ResourceModifiedError) as e:
+            raise StateConflict(device) from e
+
+    # ---- reads for the dashboard ------------------------------------------------------
+    def device_row(self, device: str) -> dict | None:
+        try:
+            return dict(self.devices.get_entity("device", device))
+        except ResourceNotFoundError:
+            return None
+
+    def boot_readings(self, device: str, boot: str, limit: int = 5000) -> list[dict]:
+        """Readings of one boot. RowKeys start with the boot id, so this is a
+        range scan inside the device's partition, not a table scan."""
+        flt = "PartitionKey eq @d and RowKey ge @lo and RowKey lt @hi"
+        params = {"d": device, "lo": f"{boot}-", "hi": f"{boot}."}   # '.' sorts right after '-'
+        rows = []
+        for e in self.readings.query_entities(flt, parameters=params):
+            rows.append(dict(e))
+            if len(rows) >= limit:
+                break
+        return rows
+
+    def device_alerts(self, device: str) -> list[dict]:
+        return [dict(e) for e in self.alerts.query_entities("PartitionKey eq @d", parameters={"d": device})]
 
     # ---- alerts ------------------------------------------------------------------------
     def raise_alert(self, alert_id: str, r: Reading, above_since_ms: int, raised_at: datetime) -> None:
@@ -93,7 +126,9 @@ class TableStore:
         })
 
     def clear_alert(self, device: str, alert_id: str, r: Reading, cleared_at: datetime) -> None:
-        self.alerts.update_entity(
+        # upsert, not update: if the raise was never written (crash between the
+        # state commit and the alert write) the clear still leaves a row
+        self.alerts.upsert_entity(
             {"PartitionKey": device, "RowKey": alert_id, "status": "CLEARED",
              "cleared_at": cleared_at, "cleared_seq": _i64(r.seq), "cleared_temp": float(r.temp)},
             mode=UpdateMode.MERGE)

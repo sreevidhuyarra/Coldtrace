@@ -51,8 +51,9 @@ class DeviceState:
     last_seq: int = 0
     above_since_ms: Optional[int] = None   # t_ms of the first reading above the limit
     open_alert: Optional[str] = None       # id of the raised, not yet cleared, alert
-    last_seen: Optional[datetime] = None
+    last_seen: Optional[datetime] = None   # IoT Hub enqueue time of the newest reading applied
     last_temp: Optional[float] = None
+    etag: Optional[str] = None             # version of the stored row this was read from
 
 
 @dataclass
@@ -69,9 +70,12 @@ class Store(Protocol):
         """Store r; True if new, False if (device, boot, seq) was already stored
         (then the stored row's duplicate counter goes up instead)."""
 
-    def get_state(self, device: str) -> DeviceState: ...
+    def get_state(self, device: str) -> DeviceState:
+        """Current state with its etag (etag None: no row yet)."""
 
-    def put_state(self, device: str, state: DeviceState) -> None: ...
+    def put_state(self, device: str, state: DeviceState) -> None:
+        """Write state only if the stored row is still the version state.etag
+        names (or still absent); otherwise raise StateConflict."""
 
     def raise_alert(self, alert_id: str, r: Reading, above_since_ms: int, raised_at: datetime) -> None: ...
 
@@ -80,6 +84,10 @@ class Store(Protocol):
 
 class BadMessage(ValueError):
     pass
+
+
+class StateConflict(Exception):
+    """Another instance updated the device's state since we read it."""
 
 
 def parse(body: bytes | str, device: str, enqueued_at: datetime) -> Reading:
@@ -108,7 +116,20 @@ def parse(body: bytes | str, device: str, enqueued_at: datetime) -> Reading:
     return Reading(device, boot, seq, t_ms, temp, enqueued_at, limit, window)
 
 
-def _excursion(state: DeviceState, r: Reading, store: Store, now: datetime, out: Outcome) -> None:
+def _is_newer(state: DeviceState, r: Reading) -> bool:
+    """Does r move this device's history forward? Replays (Event Hubs
+    redelivery, device resends) and late arrivals do not. Within a boot seq
+    decides; across boots (random ids, not ordered) the hub's receive time does."""
+    if not state.boot:
+        return True
+    if r.boot == state.boot:
+        return r.seq > state.last_seq
+    return state.last_seen is None or r.enqueued_at > state.last_seen
+
+
+def _excursion(state: DeviceState, r: Reading, actions: list) -> None:
+    """Advance the alert state machine by one reading. Alert writes are only
+    collected here; process() performs them after the state commit succeeds."""
     if r.boot != state.boot:
         state.above_since_ms = None        # t_ms from another boot can't be compared
     if r.temp > r.limit_c:
@@ -116,36 +137,60 @@ def _excursion(state: DeviceState, r: Reading, store: Store, now: datetime, out:
             state.above_since_ms = r.t_ms
         held_ms = r.t_ms - state.above_since_ms
         if state.open_alert is None and held_ms >= r.window_s * 1000:
-            state.open_alert = f"{r.device}-{r.row_key}"
-            store.raise_alert(state.open_alert, r, state.above_since_ms, now)
-            out.alerts_raised.append(state.open_alert)
+            # deterministic: two instances judging the same excursion name it alike
+            state.open_alert = f"{r.device}-{r.boot}-{state.above_since_ms:010d}"
+            actions.append(("raise", state.open_alert, r, state.above_since_ms))
     else:
         state.above_since_ms = None
         if state.open_alert is not None:
-            store.clear_alert(r.device, state.open_alert, r, now)
-            out.alerts_cleared.append(state.open_alert)
+            actions.append(("clear", state.open_alert, r, None))
             state.open_alert = None
 
 
-def process(readings: Iterable[Reading], store: Store, now: datetime) -> Outcome:
-    """Store a batch and update alerts. Readings are handled per device in
-    (boot, seq) order; a reading older than one already seen in the same boot
-    is stored but does not move the alert state backwards."""
+def process(readings: Iterable[Reading], store: Store, now: datetime, attempts: int = 5) -> Outcome:
+    """Store a batch, then advance each device's alert state.
+
+    Event Hubs delivers at least once, and two Function instances can process
+    the same partition while ownership moves (bug 006). So:
+      1. every reading is inserted once (de-duplicated on device, boot, seq);
+      2. per device, the state is read with its etag, advanced by the readings
+         that are newer than it, and written back only if nobody else wrote it
+         meanwhile; on a conflict the step repeats on fresh state;
+      3. alert rows are written only after the state commit succeeded, so a
+         losing attempt leaves nothing behind.
+    """
     out = Outcome()
     batch = sorted(readings, key=lambda r: (r.device, r.enqueued_at, r.boot, r.seq))
-    states: dict[str, DeviceState] = {}
+    by_device: dict[str, list[Reading]] = {}
     for r in batch:
-        state = states.get(r.device) or store.get_state(r.device)
-        states[r.device] = state
-        if not store.insert_reading(r, now):
+        if store.insert_reading(r, now):
+            out.stored += 1
+        else:
             out.duplicates += 1
-            continue
-        out.stored += 1
-        if r.boot == state.boot and r.seq <= state.last_seq:
-            continue                       # late arrival: stored, history unchanged
-        _excursion(state, r, store, now, out)
-        state.boot, state.last_seq = r.boot, r.seq
-        state.last_seen, state.last_temp = r.enqueued_at, r.temp
-    for device, state in states.items():
-        store.put_state(device, state)
+        by_device.setdefault(r.device, []).append(r)
+
+    for device, rows in by_device.items():
+        for _ in range(attempts):
+            state = store.get_state(device)
+            actions: list = []
+            for r in rows:
+                if not _is_newer(state, r):
+                    continue                   # replay or late arrival: stored, history unchanged
+                _excursion(state, r, actions)
+                state.boot, state.last_seq = r.boot, r.seq
+                state.last_seen, state.last_temp = r.enqueued_at, r.temp
+            try:
+                store.put_state(device, state)
+            except StateConflict:
+                continue
+            for kind, alert_id, r, since in actions:
+                if kind == "raise":
+                    store.raise_alert(alert_id, r, since, now)
+                    out.alerts_raised.append(alert_id)
+                else:
+                    store.clear_alert(device, alert_id, r, now)
+                    out.alerts_cleared.append(alert_id)
+            break
+        else:
+            raise StateConflict(f"{device}: state still changing after {attempts} attempts")
     return out

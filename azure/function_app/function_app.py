@@ -23,6 +23,7 @@ from typing import List
 
 import azure.functions as func
 
+from dashboard import summarize
 from pipeline import BadMessage, parse, process
 from table_store import TableStore
 
@@ -75,3 +76,27 @@ def ingest(events: List[func.EventHubEvent]) -> None:
     out = process(readings, store(), datetime.now(timezone.utc))
     logging.info("batch of %d: stored %d, duplicates %d, rejected %d, alerts raised %s, cleared %s",
                  len(events), out.stored, out.duplicates, rejected, out.alerts_raised, out.alerts_cleared)
+
+
+# ---- dashboard (function key required: ?code=<key>) ------------------------------------
+
+_PAGE = os.path.join(os.path.dirname(__file__), "dashboard.html")
+
+
+@app.route(route="status", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def status(req: func.HttpRequest) -> func.HttpResponse:
+    device = req.params.get("device", "coldtrace-01")
+    s = store()
+    state = s.device_row(device)
+    readings = s.boot_readings(device, state["boot"]) if state else []
+    alerts = s.device_alerts(device) if state else []
+    body = summarize(device, state, readings, alerts, datetime.now(timezone.utc))
+    return func.HttpResponse(json.dumps(body), mimetype="application/json",
+                             headers={"Cache-Control": "no-store"})
+
+
+@app.route(route="dashboard", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def dashboard(req: func.HttpRequest) -> func.HttpResponse:
+    with open(_PAGE, encoding="utf-8") as f:
+        return func.HttpResponse(f.read(), mimetype="text/html",
+                                 headers={"Cache-Control": "no-store"})

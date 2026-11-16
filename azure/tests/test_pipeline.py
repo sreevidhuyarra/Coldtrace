@@ -1,22 +1,31 @@
 """Unit tests for the cloud pipeline logic (no Azure needed)."""
 from __future__ import annotations
 
+import copy
 import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from pipeline import BadMessage, DeviceState, Reading, parse, process
+from pipeline import BadMessage, DeviceState, Reading, StateConflict, parse, process
 
 T0 = datetime(2026, 11, 17, 12, 0, tzinfo=timezone.utc)
 DEV = "coldtrace-01"
 
 
 class MemoryStore:
+    """In-memory Store with the same optimistic-concurrency rule as Table
+    Storage: put_state succeeds only if the row is unchanged since get_state."""
+
     def __init__(self):
         self.rows: dict[tuple[str, str], dict] = {}
-        self.states: dict[str, DeviceState] = {}
+        self._states: dict[str, tuple[DeviceState, int]] = {}
         self.alerts: dict[str, dict] = {}
+        self.conflicts = 0
+
+    @property
+    def states(self) -> dict[str, DeviceState]:
+        return {d: s for d, (s, _) in self._states.items()}
 
     def insert_reading(self, r, stored_at):
         key = (r.device, r.row_key)
@@ -27,10 +36,20 @@ class MemoryStore:
         return True
 
     def get_state(self, device):
-        return self.states.get(device, DeviceState())
+        if device not in self._states:
+            return DeviceState()
+        state, version = self._states[device]
+        fresh = copy.deepcopy(state)
+        fresh.etag = str(version)
+        return fresh
 
     def put_state(self, device, state):
-        self.states[device] = state
+        current = self._states.get(device)
+        if (current is None) != (state.etag is None) or (current and str(current[1]) != state.etag):
+            self.conflicts += 1
+            raise StateConflict(device)
+        version = current[1] + 1 if current else 1
+        self._states[device] = (copy.deepcopy(state), version)
 
     def raise_alert(self, alert_id, r, above_since_ms, raised_at):
         self.alerts[alert_id] = {"raised_seq": r.seq, "above_since_ms": above_since_ms, "cleared_seq": None}
@@ -188,6 +207,58 @@ def test_reboot_restarts_the_excursion_timer():
     later = T0 + timedelta(hours=1)
     out = process([above(n, boot="bbbbbbbb", at=later + timedelta(seconds=n)) for n in range(1, 5)], s, T0)
     assert out.alerts_raised == []                                           # only 90 s in boot b
+
+
+def test_replay_does_not_count_as_new_in_alert_state_even_if_reinserted():
+    """A batch delivered twice (Event Hubs at-least-once) changes nothing the second time."""
+    s = MemoryStore()
+    batch = [rd(1), above(2), above(3)]
+    process(batch, s, T0)
+    before = copy.deepcopy(s.states[DEV])
+    out = process(batch, s, T0)
+    assert out.duplicates == 3 and s.states[DEV].above_since_ms == before.above_since_ms
+
+
+# ---- concurrency (bug 006) -------------------------------------------------------------------
+
+class RacingStore(MemoryStore):
+    """Lets a second "instance" run a whole batch between the first instance's
+    get_state and put_state: the interleaving that orphaned an alert."""
+
+    def __init__(self, other_batch):
+        super().__init__()
+        self.other_batch = other_batch
+        self.raced = False
+
+    def put_state(self, device, state):
+        if not self.raced:
+            self.raced = True
+            process(self.other_batch, self, T0)     # instance B commits first
+        super().put_state(device, state)
+
+
+def test_two_instances_racing_raise_exactly_one_alert():
+    # instance A: boot a, above the limit long enough to alert
+    a = [above(n, boot="aaaaaaaa") for n in range(1, 13)]
+    # instance B: a later boot, also above the limit long enough
+    later = T0 + timedelta(hours=1)
+    b = [above(n, boot="bbbbbbbb", at=later + timedelta(seconds=n)) for n in range(1, 13)]
+    s = RacingStore(other_batch=b)
+    out_a = process(a, s, T0)
+
+    assert s.conflicts == 1                          # A's first commit was refused
+    assert len(s.alerts) == 1                        # not one per instance
+    only = next(iter(s.alerts))
+    assert s.states[DEV].open_alert == only          # and the state points at it
+    assert out_a.alerts_raised == []                 # A, retrying on B's state, saw it open
+
+
+def test_conflict_retry_gives_up_after_the_attempt_limit():
+    class AlwaysConflict(MemoryStore):
+        def put_state(self, device, state):
+            raise StateConflict(device)
+    with pytest.raises(StateConflict, match="attempts"):
+        process([rd(1)], AlwaysConflict(), T0, attempts=3)
 
 
 def test_payload_limit_and_window_are_used():
