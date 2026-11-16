@@ -19,6 +19,7 @@
 
 #include "cmd_parser.h"
 #include "hal.h"
+#include "publisher.h"
 #include "ring_buffer.h"
 
 #define LOGGER_FW_VERSION        "1.0.0"
@@ -27,6 +28,9 @@
 #define LOGGER_RATE_MAX_MS       60000u
 #define LOGGER_FAIL_THRESHOLD    3u     /* consecutive failed reads -> LOST */
 #define LOGGER_RETRY_MS          5000u  /* re-initialise interval while LOST */
+#define LOGGER_REPORT_DEFAULT_MS 30000u /* one cloud reading per 30 s: ~2,900 messages/day */
+#define LOGGER_REPORT_MIN_MS     1000u
+#define LOGGER_REPORT_MAX_MS     3600000u
 
 typedef enum { SENSOR_INIT, SENSOR_OK, SENSOR_LOST } sensor_state_t;
 
@@ -56,6 +60,14 @@ typedef struct {
     bool             fault_i2c;    /* only settable in LOGGER_TEST_HOOKS builds */
     pending_action_t pending;
     reset_reason_t   reset_reason;
+
+    /* Cloud reporting (ColdTrace). Inactive until logger_attach_net(). */
+    pub_t            pub;          /* store-and-forward queue */
+    bool             net_attached;
+    bool             net_was_up;   /* for EVT NET_UP / NET_DOWN */
+    uint32_t         report_ms;    /* one sample in this interval becomes a cloud reading */
+    uint32_t         last_report_ms;
+    bool             reported;     /* false until the first reading is queued */
 } logger_t;
 
 /* Print the BOOT line and bring the sensor up (OK, or LOST with an event). */
@@ -70,6 +82,14 @@ void             logger_tick(logger_t *lg);
 
 /* Return the pending action and clear it. */
 pending_action_t logger_take_action(logger_t *lg);
+
+/* Turn on cloud reporting: every report_ms one sample is queued for the
+ * cloud and sent through net (see publisher.h). Call after logger_init. */
+void             logger_attach_net(logger_t *lg, const net_t *net, const char *dev_id, uint32_t boot_id);
+
+/* The broker acknowledged message msg_id (prints EVT ACK <seq>). Call from
+ * the main loop, not from the MQTT client's task. */
+void             logger_on_ack(logger_t *lg, int msg_id);
 
 /* Format centi-degrees as "24.01" / "-0.89". buf must hold 12 bytes. */
 void             logger_format_temp(int16_t centi, char *buf);

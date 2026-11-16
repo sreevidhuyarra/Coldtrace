@@ -1,17 +1,17 @@
-# Day 1 simulator spike — go/no-go
+# Day 1 simulator spike â€” go/no-go
 
-Date: 2026-11-14 · Platform: espressif32@6.9.0 (Arduino-ESP32 2.0.17, ESP-IDF 4.4) · Wokwi for VS Code
+Date: 2026-11-14 Â· Platform: espressif32@6.9.0 (Arduino-ESP32 2.0.17, ESP-IDF 4.4) Â· Wokwi for VS Code
 
 Two throwaway sketches answer the two open questions from the design doc before any real code is written.
 
-## Spike 1 — MPU6050 temperature (`spike/temp`)
+## Spike 1 â€” MPU6050 temperature (`spike/temp`)
 
-Prints `SPIKE t=<ms> raw=<n> centi=<n> exact=<°C>` every second. `centi` uses the firmware's integer formula
+Prints `SPIKE t=<ms> raw=<n> centi=<n> exact=<Â°C>` every second. `centi` uses the firmware's integer formula
 `raw * 10 / 34 + 3653`; `exact` uses the datasheet formula `raw / 340 + 36.53`.
 
-**Pass:** `WHO_AM_I value=0x68`, and after each temperature change `centi` lands within ±10 (±0.1 °C) of the set value.
+**Pass:** `WHO_AM_I value=0x68`, and after each temperature change `centi` lands within Â±10 (Â±0.1 Â°C) of the set value.
 
-| Set in Wokwi (°C) | Expected raw | Expected centi | Seen raw | Seen centi | Pass? |
+| Set in Wokwi (Â°C) | Expected raw | Expected centi | Seen raw | Seen centi | Pass? |
 | --- | --- | --- | --- | --- | --- |
 | 24 (default) | -4260 | 2401 | -4260 | 2401 | Yes, exact |
 | ~40 (slider landed at 39.9) | 1146 | 3990 | 1146 | 3990 | Yes |
@@ -26,8 +26,8 @@ Findings:
   log are the slider being dragged, not noise.
 - The slider moves in steps, so "exactly 40" is hard to hit; the expected values above are recomputed for
   where it actually landed. Harness tests should set values by scenario/`set-control`, not by hand.
-- The integer formula `raw * 10 / 34 + 3653` agreed with the datasheet float formula to within 0.01 °C at
-  every one of ~180 samples, from -10.7 °C to 85 °C.
+- The integer formula `raw * 10 / 34 + 3653` agreed with the datasheet float formula to within 0.01 Â°C at
+  every one of ~180 samples, from -10.7 Â°C to 85 Â°C.
 - The serial monitor printed a staircase because the sketch sends `
 ` only. Fixed for viewing with
   `"serialMonitor": {"convertEol": true}` in `diagram.json`; the protocol stays `
@@ -36,9 +36,9 @@ Findings:
 **Result: GO.** No fallback needed.
 
 **Fallback if it fails:** keep the driver, prove the conversion only in unit tests (`test_mpu6050`), and note the
-limitation in the README; or swap to another Wokwi I²C sensor.
+limitation in the README; or swap to another Wokwi IÂ²C sensor.
 
-## Spike 2 — Task watchdog reset (`spike/wdt`)
+## Spike 2 â€” Task watchdog reset (`spike/wdt`)
 
 Boot 1 arms the TWDT (3 s, panic), feeds it for 5 s, prints `SPIKE HANG`, then stops feeding.
 
@@ -68,7 +68,7 @@ Timing (settled 2026-11-15 by a re-run that prints simulated time while hung): t
 `task_wdt` error was `SPIKE +2750 ms without feeding`, so the watchdog fired between 2.75 s and 3.0 s after the
 last feed. **The 3 s timeout works as configured.**
 
-The `E (…)` log timestamp is not usable for timing in Wokwi: it read 16 184 ms when `millis()` was about
+The `E (â€¦)` log timestamp is not usable for timing in Wokwi: it read 16 184 ms when `millis()` was about
 8 250 ms (roughly 2x). The original 16 224 ms reading was this clock difference, not a slow watchdog.
 Harness rule: allow about 5 s from `OK FAULT HANG` to the next `BOOT` line.
 
@@ -76,11 +76,11 @@ Harness rule: allow about 5 s from `OK FAULT HANG` to the next `BOOT` line.
 
 ## Decision
 
-- [x] Spike 1: **GO** — Wokwi's MPU6050 temperature model works
-- [x] Spike 2: **GO** — Wokwi emulates the watchdog reset; reason reads INT_WDT, mapped to WATCHDOG
+- [x] Spike 1: **GO** â€” Wokwi's MPU6050 temperature model works
+- [x] Spike 2: **GO** â€” Wokwi emulates the watchdog reset; reason reads INT_WDT, mapped to WATCHDOG
 - [x] Spike 3 (ColdTrace): **GO**, see below
 
-## Spike 3 — ColdTrace: Wokwi ESP32 to Azure IoT Hub (`spike/cloud`)
+## Spike 3 â€” ColdTrace: Wokwi ESP32 to Azure IoT Hub (`spike/cloud`)
 
 Date: 2026-11-16. Question: inside the Wokwi **VS Code extension**, can the ESP32 join Wi-Fi, reach the hub on
 port 8883, and publish over MQTT/TLS with a SAS token? Hub `coldtrace-hub-2db5` (F1, UAE North).
@@ -109,7 +109,7 @@ Other setup notes:
 - Azure for Students allows only five regions; of those only UAE North and Korea Central offer IoT Hub.
 - Azure CLI 2.93 creates hubs with `disableLocalAuth=true` (SAS off). The design uses SAS tokens, so it was
   set back to `false` for this development hub. Production would use Entra ID and X.509 device certificates.
-- The TLS handshake takes ~12 s of simulated time in Wokwi (ECC verify on a simulated CPU). Reconnect logic
-  must allow for it.
+- The MQTT/TLS connect takes ~31 s of simulated time in Wokwi (6.6 s to 37.7 s in the GO run; ECC
+  verification on a simulated CPU). PUBACK round trip ~300 ms. Reconnect and ack timeouts must allow for both.
 - `esp-mqtt` (ESP-IDF) is available in Arduino-ESP32 2.0.17 via `#include "mqtt_client.h"`, so Block 4 can use
   QoS 1 acknowledgements as planned.

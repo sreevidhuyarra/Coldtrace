@@ -243,19 +243,90 @@ static void cmd_stream(logger_t *lg, const cmd_t *c)
     outf(lg, "OK STREAM %s", lg->streaming ? "ON" : "OFF");
 }
 
+/* ---- cloud reporting (ColdTrace) --------------------------------------- */
+
+static const char *link_name(const logger_t *lg)
+{
+    if (!lg->net_attached) {
+        return "NONE";
+    }
+    return pub_link_up(&lg->pub) ? "UP" : "DOWN";
+}
+
+static void cmd_net(logger_t *lg)
+{
+    outf(lg, "OK NET link=%s queued=%u acked=%lu resends=%lu dropped=%lu next_seq=%lu report_ms=%lu boot=%08lx",
+         link_name(lg),
+         (unsigned)pub_queued(&lg->pub),
+         (unsigned long)lg->pub.acked,
+         (unsigned long)lg->pub.resends,
+         (unsigned long)pub_dropped(&lg->pub),
+         (unsigned long)lg->pub.next_seq,
+         (unsigned long)lg->report_ms,
+         (unsigned long)lg->pub.boot_id);
+}
+
+static void cmd_report(logger_t *lg, const cmd_t *c)
+{
+    uint32_t ms;
+    if (c->argc != 1 || !parse_u32(c->args[0], &ms)) {
+        outf(lg, "ERR ARGS");
+        return;
+    }
+    if (ms < LOGGER_REPORT_MIN_MS || ms > LOGGER_REPORT_MAX_MS) {
+        outf(lg, "ERR RANGE");
+        return;
+    }
+    lg->report_ms = ms;
+    outf(lg, "OK REPORT %lu", (unsigned long)ms);
+}
+
+/* SEND: read now and queue the reading for the cloud straight away. */
+static void cmd_send(logger_t *lg)
+{
+    int16_t centi;
+    if (!lg->net_attached) {
+        outf(lg, "ERR NONET");
+        return;
+    }
+    if (!sensor_read(lg, &centi)) {
+        outf(lg, "ERR SENSOR");
+        return;
+    }
+    uint32_t seq = pub_enqueue(&lg->pub, now_ms(lg), centi);
+    outf(lg, "OK SEND seq=%lu", (unsigned long)seq);
+}
+
 #ifdef LOGGER_TEST_HOOKS
+/* "ON" / "OFF" into *flag; false (and ERR ARGS) for anything else. */
+static bool parse_on_off(logger_t *lg, const char *arg, bool *flag)
+{
+    if (strcmp(arg, "ON") == 0) {
+        *flag = true;
+    } else if (strcmp(arg, "OFF") == 0) {
+        *flag = false;
+    } else {
+        outf(lg, "ERR ARGS");
+        return false;
+    }
+    return true;
+}
+
 static void cmd_fault(logger_t *lg, const cmd_t *c)
 {
+    bool *flag = NULL;
     if (c->argc == 2 && strcmp(c->args[0], "I2C") == 0) {
-        if (strcmp(c->args[1], "ON") == 0) {
-            lg->fault_i2c = true;
-        } else if (strcmp(c->args[1], "OFF") == 0) {
-            lg->fault_i2c = false;
-        } else {
-            outf(lg, "ERR ARGS");
-            return;
+        flag = &lg->fault_i2c;
+    } else if (c->argc == 2 && strcmp(c->args[0], "NET") == 0) {
+        flag = &lg->pub.fault_net;       /* link treated as down; platform also drops it */
+    } else if (c->argc == 2 && strcmp(c->args[0], "NOACK") == 0) {
+        flag = &lg->pub.fault_noack;     /* acks ignored, so readings are sent again */
+    }
+
+    if (flag != NULL) {
+        if (parse_on_off(lg, c->args[1], flag)) {
+            outf(lg, "OK FAULT %s %s", c->args[0], *flag ? "ON" : "OFF");
         }
-        outf(lg, "OK FAULT I2C %s", lg->fault_i2c ? "ON" : "OFF");
     } else if (c->argc == 1 && strcmp(c->args[0], "HANG") == 0) {
         outf(lg, "OK FAULT HANG");
         lg->pending = ACT_HANG;
@@ -307,6 +378,12 @@ static void run_line(logger_t *lg, char *line)
         }
     } else if (is(&c, "STREAM")) {
         cmd_stream(lg, &c);
+    } else if (is(&c, "NET")) {
+        if (no_args(lg, &c)) cmd_net(lg);
+    } else if (is(&c, "REPORT")) {
+        cmd_report(lg, &c);
+    } else if (is(&c, "SEND")) {
+        if (no_args(lg, &c)) cmd_send(lg);
     } else if (is(&c, "RESET")) {
         if (no_args(lg, &c)) {
             outf(lg, "OK RESET");
@@ -342,6 +419,8 @@ void logger_init(logger_t *lg, const hal_t *hal, reset_reason_t reason)
     lg->pending = ACT_NONE;
     lg->reset_reason = reason;
     lg->last_sample_ms = now_ms(lg);
+    pub_init(&lg->pub, NULL, "", 0);   /* no network until logger_attach_net() */
+    lg->report_ms = LOGGER_REPORT_DEFAULT_MS;
 
     outf(lg, "BOOT fw=%s reset=%s", LOGGER_FW_VERSION, logger_reset_name(reason));
 
@@ -380,12 +459,18 @@ void logger_tick(logger_t *lg)
             int16_t centi;
             lg->last_sample_ms = now;
             if (sensor_read(lg, &centi)) {
-                sample_t s = { now, centi };
+                sample_t s = { .t_ms = now, .centi_c = centi, .seq = 0 };
                 rb_push(&lg->rb, s);
                 if (lg->streaming) {
                     char t[12];
                     logger_format_temp(centi, t);
                     outf(lg, "EVT S %lu %s", (unsigned long)now, t);
+                }
+                /* the first good sample, then one per report_ms, goes to the cloud */
+                if (lg->net_attached && (!lg->reported || now - lg->last_report_ms >= lg->report_ms)) {
+                    pub_enqueue(&lg->pub, now, centi);
+                    lg->last_report_ms = now;
+                    lg->reported = true;
                 }
             }
         }
@@ -396,6 +481,31 @@ void logger_tick(logger_t *lg)
                 outf(lg, "EVT SENSOR_OK");
             }
         }
+    }
+
+    if (lg->net_attached) {
+        pub_tick(&lg->pub, now);
+        bool up = pub_link_up(&lg->pub);
+        if (up != lg->net_was_up) {
+            lg->net_was_up = up;
+            outf(lg, "EVT %s", up ? "NET_UP" : "NET_DOWN");   /* literal format: Ubuntu's gcc has -Wformat-security on */
+        }
+    }
+}
+
+void logger_attach_net(logger_t *lg, const net_t *net, const char *dev_id, uint32_t boot_id)
+{
+    pub_init(&lg->pub, net, dev_id, boot_id);
+    lg->net_attached = (net != NULL);
+    lg->net_was_up = false;
+    lg->reported = false;
+}
+
+void logger_on_ack(logger_t *lg, int msg_id)
+{
+    uint32_t seq = pub_on_ack(&lg->pub, msg_id);
+    if (seq != 0) {
+        outf(lg, "EVT ACK %lu", (unsigned long)seq);
     }
 }
 

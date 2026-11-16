@@ -16,6 +16,7 @@
 typedef struct {
     uint32_t t_ms;     /* uptime when sampled */
     int16_t  centi_c;  /* temperature x 100, e.g. 2401 = 24.01 C */
+    uint32_t seq;      /* cloud sequence number; 0 = not a cloud reading */
 } sample_t;
 
 typedef struct {
@@ -33,6 +34,9 @@ bool     rb_get(const ring_buffer_t *rb, uint8_t i, sample_t *out);
 /* Empties the buffer. The overflow counter is a since-boot statistic
  * and is deliberately kept. */
 void     rb_clear(ring_buffer_t *rb);
+/* Removes the oldest sample (the publish queue's "delivered" step).
+ * Returns false if the buffer was empty. Does not count as an overflow. */
+bool     rb_drop_oldest(ring_buffer_t *rb);
 uint32_t rb_overflows(const ring_buffer_t *rb);
 
 #endif /* RING_BUFFER_H */

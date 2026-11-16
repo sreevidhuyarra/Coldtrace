@@ -66,6 +66,29 @@ build they answer `ERR UNKNOWN`.
 | `FAULT I2C ON\|OFF` | `OK FAULT I2C ON` / `OFF` | While ON, every I²C transaction fails (simulates an unplugged sensor) |
 | `FAULT HANG` | `OK FAULT HANG` | The main loop stops feeding the watchdog; a watchdog reset follows |
 
+## Cloud reporting (ColdTrace)
+
+Present in every build. The network side is only active in the cloud firmware, which calls
+`logger_attach_net()`; elsewhere `NET` reports `link=NONE` and `SEND` answers `ERR NONET`.
+
+| Command | Success response | Error responses | Notes |
+| --- | --- | --- | --- |
+| `NET` | `OK NET link=UP\|DOWN\|NONE queued=<n> acked=<n> resends=<n> dropped=<n> next_seq=<n> report_ms=<n> boot=<hex8>` | `ERR ARGS` | Fields always in this order |
+| `REPORT <ms>` | `OK REPORT 30000` | `ERR ARGS`, `ERR RANGE` | One sample per interval goes to the cloud. Valid 1000–3600000; default 30000 |
+| `SEND` | `OK SEND seq=<n>` | `ERR NONET`, `ERR SENSOR`, `ERR ARGS` | Read now and queue the reading for the cloud |
+
+- Each cloud reading gets `seq` 1, 2, 3 … per boot, and each boot a random 32-bit `boot` id; the cloud's key
+  is (device, boot, seq). The JSON payload is
+  `{"dev":"coldtrace-01","boot":"1a2b3c4d","seq":12,"t_ms":123456,"temp":24.01}`.
+- Readings wait in a 64-slot queue until the broker acknowledges them (MQTT QoS 1). One is in flight at a
+  time; no ack within 20 s, or the link drops, and it is sent again (at-least-once delivery). A full queue drops
+  the oldest reading and counts it in `dropped`; the cloud sees the gap in `seq`.
+- `queued` counts readings not yet acknowledged; `resends` counts messages sent again.
+
+Test hooks (test build only): `FAULT NET ON|OFF` treats the link as down (the platform also drops Wi-Fi and
+MQTT); `FAULT NOACK ON|OFF` ignores acks, so every reading is sent again after the timeout and the cloud
+receives duplicates.
+
 ## Unsolicited messages
 
 | Message | When |
@@ -74,6 +97,8 @@ build they answer `ERR UNKNOWN`.
 | `EVT SENSOR_LOST` | 3 failed reads in a row (scheduled or `READ`), or the sensor was missing at boot |
 | `EVT SENSOR_OK` | The 5 s retry found the sensor again |
 | `EVT S <t_ms> <temp>` | A new sample while streaming is on |
+| `EVT NET_UP` / `EVT NET_DOWN` | The cloud link came up or went down (cloud firmware only) |
+| `EVT ACK <seq>` | The broker acknowledged reading `seq` (cloud firmware only) |
 
 ## Timing guarantees
 

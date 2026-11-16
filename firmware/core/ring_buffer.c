@@ -41,6 +41,15 @@ void rb_clear(ring_buffer_t *rb)
     rb->count = 0;
 }
 
+bool rb_drop_oldest(ring_buffer_t *rb)
+{
+    if (rb->count == 0) {
+        return false;
+    }
+    rb->count--;       /* the oldest sits count slots behind head: shrinking count forgets it */
+    return true;
+}
+
 uint32_t rb_overflows(const ring_buffer_t *rb)
 {
     return rb->overflows;

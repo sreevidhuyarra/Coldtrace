@@ -6,13 +6,30 @@ static ring_buffer_t rb;
 void setUp(void) { rb_init(&rb); }
 void tearDown(void) {}
 
-static sample_t mk(uint32_t t) { sample_t s = { t, (int16_t)(t * 10u) }; return s; }
+static sample_t mk(uint32_t t) { sample_t s = { .t_ms = t, .centi_c = (int16_t)(t * 10u), .seq = t }; return s; }
 
 static void push_n(uint32_t first_t, unsigned n)
 {
     for (unsigned i = 0; i < n; i++) {
         rb_push(&rb, mk(first_t + i));
     }
+}
+
+static void test_drop_oldest_removes_from_the_front_even_after_wrap(void)
+{
+    sample_t s;
+    TEST_ASSERT_FALSE(rb_drop_oldest(&rb));          /* empty */
+    push_n(1, RB_CAPACITY + 3u);                     /* head has wrapped; oldest is t=4 */
+    TEST_ASSERT_TRUE(rb_drop_oldest(&rb));
+    TEST_ASSERT_TRUE(rb_get(&rb, 0, &s));
+    TEST_ASSERT_EQUAL_UINT32(5, s.t_ms);
+    TEST_ASSERT_TRUE(rb_get(&rb, (uint8_t)(RB_CAPACITY - 2u), &s));
+    TEST_ASSERT_EQUAL_UINT32(RB_CAPACITY + 3u, s.t_ms);  /* newest unchanged */
+    TEST_ASSERT_EQUAL_UINT32(3, rb_overflows(&rb));      /* a drop is not an overflow */
+
+    rb_push(&rb, mk(1000));                          /* room again: no overwrite */
+    TEST_ASSERT_EQUAL_UINT32(3, rb_overflows(&rb));
+    TEST_ASSERT_EQUAL(RB_CAPACITY, rb_count(&rb));
 }
 
 static void test_new_buffer_is_empty(void)
@@ -96,5 +113,6 @@ int main(void)
     RUN_TEST(test_full_buffer_overwrites_oldest);
     RUN_TEST(test_overflow_counts_each_lost_sample);
     RUN_TEST(test_clear_empties_but_keeps_overflow_count);
+    RUN_TEST(test_drop_oldest_removes_from_the_front_even_after_wrap);
     return UNITY_END();
 }
