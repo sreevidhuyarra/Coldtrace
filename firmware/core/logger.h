@@ -21,6 +21,7 @@
 #include "hal.h"
 #include "publisher.h"
 #include "ring_buffer.h"
+#include "twin.h"
 
 #define LOGGER_FW_VERSION        "1.0.0"
 #define LOGGER_RATE_DEFAULT_MS   1000u
@@ -31,6 +32,11 @@
 #define LOGGER_REPORT_DEFAULT_MS 30000u /* one cloud reading per 30 s: ~2,900 messages/day */
 #define LOGGER_REPORT_MIN_MS     1000u
 #define LOGGER_REPORT_MAX_MS     3600000u
+#define LOGGER_LIMIT_MIN_CENTI   (-4000)  /* alarm limit range: the MPU6050's -40..85 C */
+#define LOGGER_LIMIT_MAX_CENTI   8500
+#define LOGGER_WINDOW_MIN_S      10u
+#define LOGGER_WINDOW_MAX_S      86400u
+#define LOGGER_REPORTED_MAX      192u     /* reported-properties JSON, incl. NUL */
 
 typedef enum { SENSOR_INIT, SENSOR_OK, SENSOR_LOST } sensor_state_t;
 
@@ -68,6 +74,10 @@ typedef struct {
     uint32_t         report_ms;    /* one sample in this interval becomes a cloud reading */
     uint32_t         last_report_ms;
     bool             reported;     /* false until the first reading is queued */
+    uint32_t         twin_version; /* $version of the last desired properties applied */
+
+    bool             fault_temp;   /* test hook: the sensor reads fault_temp_centi */
+    int16_t          fault_temp_centi;
 } logger_t;
 
 /* Print the BOOT line and bring the sensor up (OK, or LOST with an event). */
@@ -90,6 +100,18 @@ void             logger_attach_net(logger_t *lg, const net_t *net, const char *d
 /* The broker acknowledged message msg_id (prints EVT ACK <seq>). Call from
  * the main loop, not from the MQTT client's task. */
 void             logger_on_ack(logger_t *lg, int msg_id);
+
+/* Apply device-twin desired properties: each valid setting is applied, each
+ * invalid one is left as it was and named in "rejected". Writes the reported
+ * properties to send back, e.g.
+ *   {"report_ms":5000,"limit_c":8.00,"window_s":300,"applied_version":3,"rejected":""}
+ * Prints EVT TWIN <version>. Returns the JSON length, or -1 if cap is too small. */
+int              logger_apply_twin(logger_t *lg, const twin_desired_t *d, char *reported, size_t cap);
+
+/* Direct method "flush": read now and queue the reading for the cloud.
+ * Writes the JSON reply ({"seq":12,"queued":3} or {"error":"..."}) and returns
+ * the method status: 200, or 500 if the sensor could not be read. */
+int              logger_flush(logger_t *lg, char *reply, size_t cap);
 
 /* Format centi-degrees as "24.01" / "-0.89". buf must hold 12 bytes. */
 void             logger_format_temp(int16_t centi, char *buf);

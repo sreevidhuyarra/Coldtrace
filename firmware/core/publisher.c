@@ -17,6 +17,19 @@ void pub_init(pub_t *p, const net_t *net, const char *dev_id, uint32_t boot_id)
     }
     p->boot_id = boot_id;
     p->next_seq = 1;
+    p->limit_centi = PUB_LIMIT_DEFAULT_CENTI;
+    p->window_s = PUB_WINDOW_DEFAULT_S;
+}
+
+/* "-2.50" style: sign, whole, two decimals. */
+static void centi_str(int32_t v, char *buf, size_t cap)
+{
+    const char *sign = "";
+    if (v < 0) {
+        sign = "-";
+        v = -v;
+    }
+    snprintf(buf, cap, "%s%ld.%02ld", sign, (long)(v / 100), (long)(v % 100));
 }
 
 uint32_t pub_enqueue(pub_t *p, uint32_t t_ms, int16_t centi_c)
@@ -28,16 +41,14 @@ uint32_t pub_enqueue(pub_t *p, uint32_t t_ms, int16_t centi_c)
 
 int pub_format(const pub_t *p, const sample_t *s, char *buf, size_t cap)
 {
-    int32_t v = s->centi_c;
-    const char *sign = "";
-    if (v < 0) {
-        sign = "-";
-        v = -v;
-    }
+    char temp[24], limit[24];   /* room for any int32 value, so -O2 sees no truncation */
+    centi_str(s->centi_c, temp, sizeof temp);
+    centi_str(p->limit_centi, limit, sizeof limit);
     int n = snprintf(buf, cap,
-                     "{\"dev\":\"%s\",\"boot\":\"%08lx\",\"seq\":%lu,\"t_ms\":%lu,\"temp\":%s%ld.%02ld}",
+                     "{\"dev\":\"%s\",\"boot\":\"%08lx\",\"seq\":%lu,\"t_ms\":%lu,\"temp\":%s,"
+                     "\"limit\":%s,\"window_s\":%lu}",
                      p->dev_id, (unsigned long)p->boot_id, (unsigned long)s->seq,
-                     (unsigned long)s->t_ms, sign, (long)(v / 100), (long)(v % 100));
+                     (unsigned long)s->t_ms, temp, limit, (unsigned long)p->window_s);
     return (n < 0 || (size_t)n >= cap) ? -1 : n;
 }
 

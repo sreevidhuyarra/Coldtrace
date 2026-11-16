@@ -221,9 +221,145 @@ static void test_existing_commands_are_unchanged_by_cloud_reporting(void)
     TEST_ASSERT_EQUAL_STRING("OK DUMP 1\r\nS 3000 24.01\r\nEND\r\n", send("DUMP 1"));
 }
 
+/* ---- device twin, flush, CFG, FAULT TEMP ---------------------------------------- */
+
+static int apply(const char *json, char *rep)
+{
+    twin_desired_t d;
+    twin_parse(json, strlen(json), &d);
+    return logger_apply_twin(&lg, &d, rep, LOGGER_REPORTED_MAX);
+}
+
+static void test_cfg_shows_defaults(void)
+{
+    TEST_ASSERT_EQUAL_STRING("OK CFG report_ms=30000 limit_c=8.00 window_s=300 twin_version=0\r\n",
+                             send("CFG"));
+}
+
+static void test_twin_applies_settings_and_reports_them(void)
+{
+    char rep[LOGGER_REPORTED_MAX];
+    int n = apply("{\"report_ms\":5000,\"limit_c\":6.5,\"window_s\":120,\"$version\":3}", rep);
+    TEST_ASSERT_EQUAL_STRING(
+        "{\"report_ms\":5000,\"limit_c\":6.50,\"window_s\":120,\"applied_version\":3,\"rejected\":\"\"}", rep);
+    TEST_ASSERT_EQUAL((int)strlen(rep), n);
+    TEST_ASSERT_EQUAL_STRING("EVT TWIN 3\r\n", st.uart);
+    TEST_ASSERT_EQUAL_STRING("OK CFG report_ms=5000 limit_c=6.50 window_s=120 twin_version=3\r\n",
+                             send("CFG"));
+}
+
+static void test_twin_settings_reach_the_cloud_payload(void)
+{
+    char rep[LOGGER_REPORTED_MAX];
+    apply("{\"limit_c\":-2,\"window_s\":60,\"$version\":5}", rep);
+    send("SEND");
+    tick_at(10);
+    TEST_ASSERT_NOT_NULL(strstr(fake_net_payload(&ns, 0), "\"limit\":-2.00,\"window_s\":60}"));
+}
+
+static void test_twin_rejects_bad_values_and_keeps_the_old_ones(void)
+{
+    char rep[LOGGER_REPORTED_MAX];
+    apply("{\"report_ms\":500,\"limit_c\":\"cold\",\"window_s\":120,\"$version\":4}", rep);
+    TEST_ASSERT_EQUAL_STRING(
+        "{\"report_ms\":30000,\"limit_c\":8.00,\"window_s\":120,\"applied_version\":4,"
+        "\"rejected\":\"report_ms,limit_c\"}", rep);
+    TEST_ASSERT_EQUAL_STRING("EVT TWIN 4 rejected=report_ms,limit_c\r\n", st.uart);
+}
+
+static void test_twin_range_limits(void)
+{
+    char rep[LOGGER_REPORTED_MAX];
+    apply("{\"limit_c\":-40,\"window_s\":10,\"report_ms\":3600000}", rep);
+    TEST_ASSERT_NOT_NULL(strstr(rep, "\"rejected\":\"\""));
+    apply("{\"limit_c\":85.01,\"window_s\":9,\"report_ms\":999}", rep);
+    TEST_ASSERT_NOT_NULL(strstr(rep, "\"rejected\":\"report_ms,limit_c,window_s\""));
+    TEST_ASSERT_NOT_NULL(strstr(rep, "\"limit_c\":-40.00,\"window_s\":10,"));
+}
+
+static void test_twin_without_version_keeps_the_last_version(void)
+{
+    char rep[LOGGER_REPORTED_MAX];
+    apply("{\"window_s\":60,\"$version\":8}", rep);
+    apply("{\"window_s\":90}", rep);
+    TEST_ASSERT_NOT_NULL(strstr(rep, "\"window_s\":90,\"applied_version\":8,"));
+}
+
+static void test_twin_reported_buffer_too_small_returns_minus_one(void)
+{
+    twin_desired_t d;
+    char small[20];
+    twin_parse("{}", 2, &d);
+    TEST_ASSERT_EQUAL(-1, logger_apply_twin(&lg, &d, small, sizeof small));
+}
+
+static void test_flush_queues_a_reading_and_replies_with_its_seq(void)
+{
+    char reply[64];
+    send("FAULT NET ON");                                   /* hold it in the queue */
+    TEST_ASSERT_EQUAL(200, logger_flush(&lg, reply, sizeof reply));
+    TEST_ASSERT_EQUAL_STRING("{\"seq\":1,\"queued\":1}", reply);
+    TEST_ASSERT_EQUAL(200, logger_flush(&lg, reply, sizeof reply));
+    TEST_ASSERT_EQUAL_STRING("{\"seq\":2,\"queued\":2}", reply);
+}
+
+static void test_flush_with_a_failed_read_returns_500(void)
+{
+    char reply[64];
+    st.fail_next = 1;
+    TEST_ASSERT_EQUAL(500, logger_flush(&lg, reply, sizeof reply));
+    TEST_ASSERT_EQUAL_STRING("{\"error\":\"sensor\"}", reply);
+}
+
+static void test_fault_temp_overrides_the_sensor_until_off(void)
+{
+    TEST_ASSERT_EQUAL_STRING("OK FAULT TEMP 9.50\r\n", send("FAULT TEMP 9.5"));
+    TEST_ASSERT_EQUAL_STRING("OK TEMP 9.50\r\n", send("READ"));
+    unsigned reads = st.reads;
+    send("SEND");
+    TEST_ASSERT_EQUAL(reads, st.reads);                     /* no bus traffic */
+    tick_at(10);
+    TEST_ASSERT_NOT_NULL(strstr(fake_net_payload(&ns, 0), "\"temp\":9.50,"));
+    TEST_ASSERT_EQUAL_STRING("OK FAULT TEMP -3.25\r\n", send("FAULT TEMP -3.25"));
+    TEST_ASSERT_EQUAL_STRING("OK FAULT TEMP OFF\r\n", send("FAULT TEMP OFF"));
+    TEST_ASSERT_EQUAL_STRING("OK TEMP 24.01\r\n", send("READ"));
+}
+
+static void test_fault_temp_rejects_bad_values(void)
+{
+    TEST_ASSERT_EQUAL_STRING("ERR ARGS\r\n", send("FAULT TEMP"));
+    TEST_ASSERT_EQUAL_STRING("ERR ARGS\r\n", send("FAULT TEMP hot"));
+    TEST_ASSERT_EQUAL_STRING("ERR ARGS\r\n", send("FAULT TEMP 90"));
+    TEST_ASSERT_EQUAL_STRING("ERR ARGS\r\n", send("FAULT TEMP 1.234"));
+    TEST_ASSERT_FALSE(lg.fault_temp);
+}
+
+static void test_fault_temp_bypasses_the_bus_until_turned_off(void)
+{
+    send("FAULT TEMP 5");
+    send("FAULT I2C ON");
+    run_until(5000);                                        /* 3 failed scheduled reads */
+    TEST_ASSERT_EQUAL(SENSOR_OK, lg.sensor);                /* override: no bus reads, stays OK */
+    send("FAULT TEMP OFF");
+    run_until(9000);
+    TEST_ASSERT_EQUAL(SENSOR_LOST, lg.sensor);              /* real reads fail again */
+}
+
 int main(void)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_cfg_shows_defaults);
+    RUN_TEST(test_twin_applies_settings_and_reports_them);
+    RUN_TEST(test_twin_settings_reach_the_cloud_payload);
+    RUN_TEST(test_twin_rejects_bad_values_and_keeps_the_old_ones);
+    RUN_TEST(test_twin_range_limits);
+    RUN_TEST(test_twin_without_version_keeps_the_last_version);
+    RUN_TEST(test_twin_reported_buffer_too_small_returns_minus_one);
+    RUN_TEST(test_flush_queues_a_reading_and_replies_with_its_seq);
+    RUN_TEST(test_flush_with_a_failed_read_returns_500);
+    RUN_TEST(test_fault_temp_overrides_the_sensor_until_off);
+    RUN_TEST(test_fault_temp_rejects_bad_values);
+    RUN_TEST(test_fault_temp_bypasses_the_bus_until_turned_off);
     RUN_TEST(test_without_network_net_reports_none_and_send_is_refused);
     RUN_TEST(test_first_sample_is_reported_then_one_per_report_interval);
     RUN_TEST(test_report_interval_is_settable_within_range);

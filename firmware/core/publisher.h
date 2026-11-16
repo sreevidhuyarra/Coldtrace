@@ -30,8 +30,10 @@
 
 #define PUB_ACK_TIMEOUT_MS  20000u  /* resend if no PUBACK in this time (Wokwi round trip ~0.3 s) */
 #define PUB_RETRY_MS        1000u   /* wait after the transport refused a message */
-#define PUB_PAYLOAD_MAX     128u    /* bytes incl. NUL; IoT Hub meters in 512-byte blocks */
+#define PUB_PAYLOAD_MAX     160u    /* bytes incl. NUL; IoT Hub meters in 512-byte blocks */
 #define PUB_DEV_ID_MAX      32u     /* incl. NUL */
+#define PUB_LIMIT_DEFAULT_CENTI  800 /* 8.00 C: cold-chain upper limit */
+#define PUB_WINDOW_DEFAULT_S     300u /* above the limit this long -> alert */
 
 /* What the publisher needs from the network. The platform layer fills it in
  * (esp-mqtt on the ESP32, a fake in the unit tests). */
@@ -53,6 +55,8 @@ typedef struct {
     char          dev_id[PUB_DEV_ID_MAX];
     uint32_t      boot_id;
     uint32_t      next_seq;       /* seq the next enqueued reading gets; starts at 1 */
+    int32_t       limit_centi;    /* alarm settings sent with every reading (device twin) */
+    uint32_t      window_s;
 
     bool          in_flight;      /* a message is out and its ack is awaited */
     uint32_t      in_flight_seq;
@@ -87,7 +91,9 @@ bool     pub_link_up(const pub_t *p);
 uint8_t  pub_queued(const pub_t *p);
 uint32_t pub_dropped(const pub_t *p);   /* lost to queue overflow since boot */
 
-/* {"dev":"coldtrace-01","boot":"1a2b3c4d","seq":12,"t_ms":123456,"temp":24.01}
+/* {"dev":"coldtrace-01","boot":"1a2b3c4d","seq":12,"t_ms":123456,"temp":24.01,"limit":8.00,"window_s":300}
+ * limit/window_s are the settings in force when the reading is sent; the
+ * cloud's excursion check uses them, so a twin change applies end to end.
  * Returns the length written (excluding NUL), or -1 if cap is too small. */
 int      pub_format(const pub_t *p, const sample_t *s, char *buf, size_t cap);
 

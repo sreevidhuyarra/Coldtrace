@@ -32,6 +32,7 @@ static void test_fault_commands_are_unknown_without_hooks(void)
     TEST_ASSERT_EQUAL_STRING("ERR UNKNOWN\r\n", send("FAULT HANG"));
     TEST_ASSERT_EQUAL_STRING("ERR UNKNOWN\r\n", send("FAULT NET ON"));
     TEST_ASSERT_EQUAL_STRING("ERR UNKNOWN\r\n", send("FAULT NOACK ON"));
+    TEST_ASSERT_EQUAL_STRING("ERR UNKNOWN\r\n", send("FAULT TEMP 9"));
     TEST_ASSERT_EQUAL(ACT_NONE, logger_take_action(&lg));
     TEST_ASSERT_FALSE(lg.fault_i2c);
     TEST_ASSERT_FALSE(lg.pub.fault_net);

@@ -137,6 +137,10 @@ static bool sensor_read(logger_t *lg, int16_t *centi)
     if (lg->sensor != SENSOR_OK) {
         return false;
     }
+    if (lg->fault_temp) {               /* FAULT TEMP: a simulated temperature, no bus traffic */
+        *centi = lg->fault_temp_centi;
+        return true;
+    }
     if (mpu6050_read_centi(&lg->bus, centi) == MPU_OK) {
         lg->consecutive_fails = 0;
         return true;
@@ -281,20 +285,38 @@ static void cmd_report(logger_t *lg, const cmd_t *c)
     outf(lg, "OK REPORT %lu", (unsigned long)ms);
 }
 
+/* Read now and queue the reading for the cloud; *seq is its number.
+ * False if the sensor could not be read. */
+static bool queue_reading_now(logger_t *lg, uint32_t *seq)
+{
+    int16_t centi;
+    if (!sensor_read(lg, &centi)) {
+        return false;
+    }
+    *seq = pub_enqueue(&lg->pub, now_ms(lg), centi);
+    return true;
+}
+
 /* SEND: read now and queue the reading for the cloud straight away. */
 static void cmd_send(logger_t *lg)
 {
-    int16_t centi;
+    uint32_t seq;
     if (!lg->net_attached) {
         outf(lg, "ERR NONET");
-        return;
-    }
-    if (!sensor_read(lg, &centi)) {
+    } else if (!queue_reading_now(lg, &seq)) {
         outf(lg, "ERR SENSOR");
-        return;
+    } else {
+        outf(lg, "OK SEND seq=%lu", (unsigned long)seq);
     }
-    uint32_t seq = pub_enqueue(&lg->pub, now_ms(lg), centi);
-    outf(lg, "OK SEND seq=%lu", (unsigned long)seq);
+}
+
+static void cmd_cfg(logger_t *lg)
+{
+    char limit[12];
+    logger_format_temp((int16_t)lg->pub.limit_centi, limit);
+    outf(lg, "OK CFG report_ms=%lu limit_c=%s window_s=%lu twin_version=%lu",
+         (unsigned long)lg->report_ms, limit, (unsigned long)lg->pub.window_s,
+         (unsigned long)lg->twin_version);
 }
 
 #ifdef LOGGER_TEST_HOOKS
@@ -326,6 +348,23 @@ static void cmd_fault(logger_t *lg, const cmd_t *c)
     if (flag != NULL) {
         if (parse_on_off(lg, c->args[1], flag)) {
             outf(lg, "OK FAULT %s %s", c->args[0], *flag ? "ON" : "OFF");
+        }
+    } else if (c->argc == 2 && strcmp(c->args[0], "TEMP") == 0) {
+        /* FAULT TEMP <C> | OFF: the sensor reads this temperature (excursion tests) */
+        int32_t centi;
+        const char *a = c->args[1];
+        if (strcmp(a, "OFF") == 0) {
+            lg->fault_temp = false;
+            outf(lg, "OK FAULT TEMP OFF");
+        } else if (twin_parse_centi(a, a + strlen(a), &centi) &&
+                   centi >= LOGGER_LIMIT_MIN_CENTI && centi <= LOGGER_LIMIT_MAX_CENTI) {
+            char t[12];
+            lg->fault_temp = true;
+            lg->fault_temp_centi = (int16_t)centi;
+            logger_format_temp(lg->fault_temp_centi, t);
+            outf(lg, "OK FAULT TEMP %s", t);
+        } else {
+            outf(lg, "ERR ARGS");
         }
     } else if (c->argc == 1 && strcmp(c->args[0], "HANG") == 0) {
         outf(lg, "OK FAULT HANG");
@@ -384,6 +423,8 @@ static void run_line(logger_t *lg, char *line)
         cmd_report(lg, &c);
     } else if (is(&c, "SEND")) {
         if (no_args(lg, &c)) cmd_send(lg);
+    } else if (is(&c, "CFG")) {
+        if (no_args(lg, &c)) cmd_cfg(lg);
     } else if (is(&c, "RESET")) {
         if (no_args(lg, &c)) {
             outf(lg, "OK RESET");
@@ -507,6 +548,66 @@ void logger_on_ack(logger_t *lg, int msg_id)
     if (seq != 0) {
         outf(lg, "EVT ACK %lu", (unsigned long)seq);
     }
+}
+
+/* Append ",name" (or "name" first) to the rejected list. */
+static void reject(char *list, size_t cap, const char *name)
+{
+    size_t n = strlen(list);
+    snprintf(list + n, cap - n, "%s%s", n ? "," : "", name);
+}
+
+int logger_apply_twin(logger_t *lg, const twin_desired_t *d, char *reported, size_t cap)
+{
+    char rejected[48] = "";
+
+    if (d->report_ms_state == TWIN_OK && d->report_ms >= LOGGER_REPORT_MIN_MS &&
+        d->report_ms <= LOGGER_REPORT_MAX_MS) {
+        lg->report_ms = d->report_ms;
+    } else if (d->report_ms_state != TWIN_ABSENT) {
+        reject(rejected, sizeof rejected, "report_ms");
+    }
+
+    if (d->limit_state == TWIN_OK && d->limit_centi >= LOGGER_LIMIT_MIN_CENTI &&
+        d->limit_centi <= LOGGER_LIMIT_MAX_CENTI) {
+        lg->pub.limit_centi = d->limit_centi;
+    } else if (d->limit_state != TWIN_ABSENT) {
+        reject(rejected, sizeof rejected, "limit_c");
+    }
+
+    if (d->window_state == TWIN_OK && d->window_s >= LOGGER_WINDOW_MIN_S &&
+        d->window_s <= LOGGER_WINDOW_MAX_S) {
+        lg->pub.window_s = d->window_s;
+    } else if (d->window_state != TWIN_ABSENT) {
+        reject(rejected, sizeof rejected, "window_s");
+    }
+
+    if (d->has_version) {
+        lg->twin_version = d->version;
+    }
+    outf(lg, "EVT TWIN %lu%s%s", (unsigned long)lg->twin_version,
+         rejected[0] ? " rejected=" : "", rejected);
+
+    char limit[12];
+    logger_format_temp((int16_t)lg->pub.limit_centi, limit);
+    int n = snprintf(reported, cap,
+                     "{\"report_ms\":%lu,\"limit_c\":%s,\"window_s\":%lu,\"applied_version\":%lu,"
+                     "\"rejected\":\"%s\"}",
+                     (unsigned long)lg->report_ms, limit, (unsigned long)lg->pub.window_s,
+                     (unsigned long)lg->twin_version, rejected);
+    return (n < 0 || (size_t)n >= cap) ? -1 : n;
+}
+
+int logger_flush(logger_t *lg, char *reply, size_t cap)
+{
+    uint32_t seq;
+    if (!queue_reading_now(lg, &seq)) {
+        snprintf(reply, cap, "{\"error\":\"sensor\"}");
+        return 500;
+    }
+    snprintf(reply, cap, "{\"seq\":%lu,\"queued\":%u}", (unsigned long)seq,
+             (unsigned)pub_queued(&lg->pub));
+    return 200;
 }
 
 pending_action_t logger_take_action(logger_t *lg)

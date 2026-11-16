@@ -36,17 +36,18 @@ COMMON := $(UNITY)/unity.c $(FAKES)/fake_hal.c
 SRC_test_ring_buffer := $(CORE)/ring_buffer.c
 SRC_test_cmd_parser  := $(CORE)/cmd_parser.c
 SRC_test_mpu6050     := $(CORE)/mpu6050.c
-SRC_test_logger      := $(CORE)/logger.c $(CORE)/publisher.c $(CORE)/ring_buffer.c $(CORE)/cmd_parser.c $(CORE)/mpu6050.c
+SRC_test_logger      := $(CORE)/logger.c $(CORE)/publisher.c $(CORE)/twin.c $(CORE)/ring_buffer.c $(CORE)/cmd_parser.c $(CORE)/mpu6050.c
 SRC_test_logger_nohooks := $(SRC_test_logger)
 SRC_test_publisher   := $(CORE)/publisher.c $(CORE)/ring_buffer.c $(FAKES)/fake_net.c
 SRC_test_logger_net  := $(SRC_test_logger) $(FAKES)/fake_net.c
+SRC_test_twin        := $(CORE)/twin.c
 
 # test name -> extra defines. test_logger_nohooks is the production build.
 DEFS_test_logger := -DLOGGER_TEST_HOOKS
 DEFS_test_logger_net := -DLOGGER_TEST_HOOKS
 
 SUITES := test_ring_buffer test_cmd_parser test_mpu6050 test_logger test_logger_nohooks \
-          test_publisher test_logger_net
+          test_publisher test_logger_net test_twin
 BINS   := $(addprefix $(BUILD)/,$(addsuffix $(EXE),$(SUITES)))
 
 .DEFAULT_GOAL := test
@@ -56,7 +57,7 @@ BINS   := $(addprefix $(BUILD)/,$(addsuffix $(EXE),$(SUITES)))
 # ---- host simulator (Project 1) ------------------------------------------
 # The firmware core + sim/host_main.c. build/sim has the test hooks,
 # build/sim_prod is the production build (FAULT -> ERR UNKNOWN).
-CORE_SRC  := $(CORE)/logger.c $(CORE)/publisher.c $(CORE)/ring_buffer.c $(CORE)/cmd_parser.c $(CORE)/mpu6050.c
+CORE_SRC  := $(CORE)/logger.c $(CORE)/publisher.c $(CORE)/twin.c $(CORE)/ring_buffer.c $(CORE)/cmd_parser.c $(CORE)/mpu6050.c
 SIM_FLAGS := -std=c99 -Wall -Wextra -Werror -pedantic -O2 -pthread -I$(CORE)
 
 sim: $(BUILD)/sim$(EXE) $(BUILD)/sim_prod$(EXE)

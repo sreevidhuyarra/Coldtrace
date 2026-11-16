@@ -49,7 +49,8 @@ static void test_payload_is_small_json_with_device_boot_and_seq(void)
     char buf[PUB_PAYLOAD_MAX];
     int n = pub_format(&p, &s, buf, sizeof buf);
     TEST_ASSERT_EQUAL_STRING(
-        "{\"dev\":\"coldtrace-01\",\"boot\":\"1a2b3c4d\",\"seq\":12,\"t_ms\":123456,\"temp\":24.01}", buf);
+        "{\"dev\":\"coldtrace-01\",\"boot\":\"1a2b3c4d\",\"seq\":12,\"t_ms\":123456,\"temp\":24.01,"
+        "\"limit\":8.00,\"window_s\":300}", buf);
     TEST_ASSERT_EQUAL((int)strlen(buf), n);
     TEST_ASSERT_LESS_THAN(512, n);   /* one IoT Hub metering block */
 }
@@ -60,9 +61,12 @@ static void test_payload_formats_negative_and_small_temperatures(void)
     sample_t a = { .t_ms = 0, .centi_c = -89, .seq = 1 };
     sample_t b = { .t_ms = 0, .centi_c = -2005, .seq = 1 };
     pub_format(&p, &a, buf, sizeof buf);
-    TEST_ASSERT_NOT_NULL(strstr(buf, "\"temp\":-0.89}"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"temp\":-0.89,"));
     pub_format(&p, &b, buf, sizeof buf);
-    TEST_ASSERT_NOT_NULL(strstr(buf, "\"temp\":-20.05}"));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"temp\":-20.05,"));
+    p.limit_centi = -250;
+    pub_format(&p, &b, buf, sizeof buf);
+    TEST_ASSERT_NOT_NULL(strstr(buf, "\"limit\":-2.50,"));
 }
 
 static void test_payload_refuses_a_buffer_too_small_rather_than_cutting(void)

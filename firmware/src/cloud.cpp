@@ -32,11 +32,20 @@ static const char    *WIFI_SSID      = "Wokwi-GUEST";   /* Wokwi's open virtual 
 static const int      WIFI_CHANNEL   = 6;               /* skips the scan in Wokwi */
 static const uint32_t MQTT_TIMEOUT_MS = 30000;          /* TLS handshake takes ~31 s simulated in Wokwi */
 
+static const size_t  DATA_MAX = 2048;                   /* largest twin/method message we accept */
+
 /* What the MQTT task tells the loop. */
 typedef struct {
-    enum { MSG_ACK, MSG_ERROR } kind;
-    int a, b, c;                /* ACK: msg_id. ERROR: error type, connack code, TLS error */
+    enum { MSG_ACK, MSG_ERROR, MSG_DATA } kind;
+    int a, b, c;                /* ACK: msg_id. ERROR: error type, connack code, TLS error.
+                                   DATA: topic length, payload length */
+    char *buf;                  /* DATA: heap copy "topic\0payload\0", freed by the loop */
 } cloud_msg_t;
+
+/* Twin and direct-method topics (IoT Hub's MQTT conventions). */
+static const char *T_TWIN_RES      = "$iothub/twin/res/";
+static const char *T_TWIN_DESIRED  = "$iothub/twin/PATCH/properties/desired/";
+static const char *T_METHOD        = "$iothub/methods/POST/";
 
 RTC_NOINIT_ATTR volatile uint32_t g_cloud_stage;
 
@@ -90,7 +99,34 @@ static void on_mqtt(void *, esp_event_base_t, int32_t id, void *data)
     cloud_msg_t m = {};
     switch ((esp_mqtt_event_id_t)id) {
     case MQTT_EVENT_CONNECTED:
+        /* subscriptions don't survive a reconnect (clean session): renew them,
+         * then ask for the full twin so settings changed while offline apply */
+        esp_mqtt_client_subscribe(e->client, "$iothub/twin/res/#", 0);
+        esp_mqtt_client_subscribe(e->client, "$iothub/twin/PATCH/properties/desired/#", 0);
+        esp_mqtt_client_subscribe(e->client, "$iothub/methods/POST/#", 0);
+        esp_mqtt_client_publish(e->client, "$iothub/twin/GET/?$rid=get", "", 0, 0, 0);
         s_mqtt_up = true;
+        break;
+    case MQTT_EVENT_DATA:
+        /* whole messages only (twin docs and method calls are small); copy,
+         * because the event's buffers are reused once this returns */
+        if (e->current_data_offset == 0 && e->data_len == e->total_data_len &&
+            e->topic_len > 0 && (size_t)(e->topic_len + e->data_len) < DATA_MAX) {
+            char *buf = (char *)malloc((size_t)e->topic_len + (size_t)e->data_len + 2u);
+            if (buf != nullptr) {
+                memcpy(buf, e->topic, (size_t)e->topic_len);
+                buf[e->topic_len] = '\0';
+                memcpy(buf + e->topic_len + 1, e->data, (size_t)e->data_len);
+                buf[e->topic_len + 1 + e->data_len] = '\0';
+                m.kind = cloud_msg_t::MSG_DATA;
+                m.a = e->topic_len;
+                m.b = e->data_len;
+                m.buf = buf;
+                if (xQueueSend(s_queue, &m, 0) != pdTRUE) {
+                    free(buf);
+                }
+            }
+        }
         break;
     case MQTT_EVENT_DISCONNECTED:
         s_mqtt_up = false;
@@ -202,6 +238,88 @@ static void settle_boot_id(logger_t *lg)
     s_boot_id_set = true;
 }
 
+static bool starts_with(const char *s, const char *prefix)
+{
+    return strncmp(s, prefix, strlen(prefix)) == 0;
+}
+
+/* "...?$rid=abc&..." -> "abc" into out. */
+static void query_value(const char *topic, const char *key, char *out, size_t cap)
+{
+    out[0] = '\0';
+    const char *p = strstr(topic, key);
+    if (p == nullptr) {
+        return;
+    }
+    p += strlen(key);
+    size_t n = strcspn(p, "&");
+    if (n >= cap) {
+        n = cap - 1;
+    }
+    memcpy(out, p, n);
+    out[n] = '\0';
+}
+
+/* Desired properties (full twin or patch): apply in the core, report back. */
+static void handle_twin(logger_t *lg, const char *json, size_t len)
+{
+    static uint32_t s_rid;
+    twin_desired_t d;
+    char reported[LOGGER_REPORTED_MAX], topic[80];
+    if (!twin_parse(json, len, &d)) {
+        Serial.printf("EVT TWIN_BAD\r\n");
+        return;
+    }
+    int n = logger_apply_twin(lg, &d, reported, sizeof reported);
+    if (n < 0) {
+        return;
+    }
+    snprintf(topic, sizeof topic, "$iothub/twin/PATCH/properties/reported/?$rid=r%lu",
+             (unsigned long)++s_rid);
+    esp_mqtt_client_publish(s_mqtt, topic, reported, n, 0, 0);
+}
+
+/* $iothub/methods/POST/<name>/?$rid=<rid> -> run it, reply on methods/res. */
+static void handle_method(logger_t *lg, const char *topic)
+{
+    char name[24], rid[24], reply[96], res_topic[80];
+    const char *p = topic + strlen(T_METHOD);
+    size_t n = strcspn(p, "/");
+    if (n >= sizeof name) {
+        n = sizeof name - 1;
+    }
+    memcpy(name, p, n);
+    name[n] = '\0';
+    query_value(topic, "$rid=", rid, sizeof rid);
+
+    int status;
+    if (strcmp(name, "flush") == 0) {
+        status = logger_flush(lg, reply, sizeof reply);
+    } else {
+        status = 404;
+        snprintf(reply, sizeof reply, "{\"error\":\"unknown method\"}");
+    }
+    snprintf(res_topic, sizeof res_topic, "$iothub/methods/res/%d/?$rid=%s", status, rid);
+    esp_mqtt_client_publish(s_mqtt, res_topic, reply, 0, 0, 0);
+    Serial.printf("EVT METHOD %s %d\r\n", name, status);
+}
+
+static void handle_data(logger_t *lg, const char *topic, const char *data, size_t len)
+{
+    if (starts_with(topic, T_TWIN_DESIRED)) {
+        handle_twin(lg, data, len);
+    } else if (starts_with(topic, T_TWIN_RES)) {
+        int status = atoi(topic + strlen(T_TWIN_RES));
+        if (status == 200 && len > 0) {
+            handle_twin(lg, data, len);       /* the full twin we asked for on connect */
+        } else if (status < 200 || status >= 300) {
+            Serial.printf("EVT NET_ERR twin=%d\r\n", status);
+        }                                     /* 204: reported properties accepted */
+    } else if (starts_with(topic, T_METHOD)) {
+        handle_method(lg, topic);
+    }
+}
+
 void cloud_loop(logger_t *lg)
 {
     apply_fault_net(lg);
@@ -216,6 +334,11 @@ void cloud_loop(logger_t *lg)
     while (xQueueReceive(s_queue, &m, 0) == pdTRUE) {
         if (m.kind == cloud_msg_t::MSG_ACK) {
             logger_on_ack(lg, m.a);
+        } else if (m.kind == cloud_msg_t::MSG_DATA) {
+            CLOUD_STAGE(STAGE_DATA);
+            handle_data(lg, m.buf, m.buf + m.a + 1, (size_t)m.b);
+            free(m.buf);
+            CLOUD_STAGE(STAGE_QUEUE);
         } else {
             Serial.printf("EVT NET_ERR type=%d connack=%d tls=0x%x\r\n", m.a, m.b, (unsigned)m.c);
         }

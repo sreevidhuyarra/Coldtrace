@@ -44,9 +44,14 @@ The breadcrumb (`EVT WDT_STAGE`) stays in the cloud build: a watchdog reset now 
 loop was.
 
 ## Verification
-- Outage cycles (3 min, 1 min, 3 min `FAULT NET`) on the fixed firmware: see the table in
-  `docs/spike-notes.md` / the Block 4 results.
-- Unit tests unaffected (the fix is in the platform layer).
+| Firmware | Outage cycles (`FAULT NET` for 3, 1, 3, 3 min) | Watchdog resets |
+| --- | --- | --- |
+| Before the fix (run 5 above) | 3 | 1 (`WDT_STAGE 6`, cycle 3) |
+| Fixed (`b5373696`) | 4, about 160 queued readings delivered | 0 |
+
+The crash was intermittent, so four clean cycles are strong evidence rather than proof; the Block 8
+outage test repeats the reconnect on every run. Unit tests are unaffected (the fix is in the platform
+layer).
 
 ## Lesson
 A watchdog that guards a control loop also defines a scheduling contract: every task that can hold the
